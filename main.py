@@ -2,9 +2,7 @@ import pygame
 import random
 import sys
 
-# =========================================================
-# FUNÇÃO PARA REINICIAR O JOGO (PESSOA 1 E PESSOA 2)
-# =========================================================
+# FUNÇÃO PARA REINICIAR O JOGO 
 def iniciar_novo_jogo():
     suspeitos = ["Mordomo", "Cozinheira", "Jardineiro", "Motorista"]
     armas = ["Veneno", "Pistola", "Faca", "Corda"]
@@ -49,7 +47,6 @@ def iniciar_novo_jogo():
     ]
     random.shuffle(pistas)
 
-    # Retorna o novo estado zerado do jogo
     return {
         "suspeitos": suspeitos,
         "armas": armas,
@@ -66,9 +63,7 @@ def iniciar_novo_jogo():
         "jogo_encerrado": False
     }
 
-# =========================================================
-# 💻 INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
-# =========================================================
+# INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
 pygame.init()
 LARGURA, ALTURA = 1200, 700
 tela = pygame.display.set_mode((LARGURA, ALTURA))
@@ -87,6 +82,7 @@ COR_VERDE = (60, 200, 100)
 COR_CELULA = (40, 45, 60)
 COR_DIVISOR_TABELA = (90, 100, 130)
 COR_MODAL_FUNDO = (15, 18, 24)
+COR_BOTAO_SETA = (50, 60, 80)
 
 # Configuração de Fontes
 fonte_titulo = pygame.font.SysFont("arial", 20)
@@ -102,13 +98,14 @@ tam_celula = 50
 ox = 740
 oy = 100
 
-# Inicializa as variáveis da partida
+# Inicializa o estado do jogo
 estado_jogo = iniciar_novo_jogo()
 
 modal_acusacao_aberto = False
 sel_suspeito = 0
 sel_arma = 0
 sel_local = 0
+categoria_foco = 0
 
 def desenhar_texto_multilinhas(superficie, texto, x, y, largura_max, fonte, cor):
     palavras = texto.split(' ')
@@ -142,7 +139,7 @@ while rodando:
     # 1. DESENHAR METADE ESQUERDA (PISTAS E BOTÕES)
     pygame.draw.rect(tela, COR_ESQUERDA, (0, 0, 500, ALTURA))
     
-    txt_tit1 = fonte_titulo.render("🔍 PISTAS REVELADAS", True, COR_AMARELO)
+    txt_tit1 = fonte_titulo.render("PISTAS REVELADAS", True, COR_AMARELO)
     tela.blit(txt_tit1, (20, 15))
 
     # Exibe histórico de pistas
@@ -176,7 +173,7 @@ while rodando:
     # 3. DESENHAR METADE DIREITA (GRELHA DE DEDUÇÃO)
     pygame.draw.rect(tela, COR_DIREITA, (500, 0, 700, ALTURA))
     
-    txt_tit2 = fonte_titulo.render("📝 GRELHA DE DEDUÇÃO", True, COR_AMARELO)
+    txt_tit2 = fonte_titulo.render("GRELHA DE DEDUÇÃO", True, COR_AMARELO)
     tela.blit(txt_tit2, (520, 15))
 
     # Rótulos dos Suspeitos (Topo)
@@ -204,7 +201,7 @@ while rodando:
 
     pygame.draw.line(tela, COR_DIVISOR_TABELA, (ox - 140, oy + 4 * tam_celula - 1), (ox + 4 * tam_celula, oy + 4 * tam_celula - 1), 3)
 
-    # 4. MODAL DE ACUSAÇÃO (SE ABERTO)
+    # 4. MODAL DE ACUSAÇÃO INTERATIVO (COM POSIÇÕES FIXAS PARA AS SETAS)
     if modal_acusacao_aberto and not estado_jogo["jogo_encerrado"]:
         s_overlay = pygame.Surface((LARGURA, ALTURA))
         s_overlay.set_alpha(200)
@@ -215,32 +212,67 @@ while rodando:
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_modal, border_radius=12)
         pygame.draw.rect(tela, COR_AMARELO, rect_modal, 2, border_radius=12)
 
-        txt_mod_tit = fonte_titulo.render("⚖️ MONTE SUA ACUSAÇÃO", True, COR_AMARELO)
+        txt_mod_tit = fonte_titulo.render("MONTE SUA ACUSAÇÃO", True, COR_AMARELO)
         tela.blit(txt_mod_tit, (370, 170))
 
-        txt_s = fonte_grelha.render(f"1. Suspeito: < {suspeitos[sel_suspeito]} >", True, COR_TEXTO)
-        tela.blit(txt_s, (380, 220))
+        # BOTÕES DAS SETAS COM POSIÇÕES FIXAS ABSOLUTAS
+        btn_s_esq = pygame.Rect(480, 215, 35, 30)
+        btn_s_dir = pygame.Rect(720, 215, 35, 30)
+        
+        btn_a_esq = pygame.Rect(480, 275, 35, 30)
+        btn_a_dir = pygame.Rect(720, 275, 35, 30)
+        
+        btn_l_esq = pygame.Rect(480, 335, 35, 30)
+        btn_l_dir = pygame.Rect(720, 335, 35, 30)
 
-        txt_a = fonte_grelha.render(f"2. Arma:     < {armas[sel_arma]} >", True, COR_TEXTO)
-        tela.blit(txt_a, (380, 280))
+        # Desenhar Botões < e > de Suspeito
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_esq, border_radius=5)
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_dir, border_radius=5)
+        tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_s_esq.x + 11, btn_s_esq.y + 3))
+        tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_s_dir.x + 11, btn_s_dir.y + 3))
 
-        txt_l = fonte_grelha.render(f"3. Local:    < {locais[sel_local]} >", True, COR_TEXTO)
-        tela.blit(txt_l, (380, 340))
+        # Desenhar Botões < e > de Arma
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_esq, border_radius=5)
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_dir, border_radius=5)
+        tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_a_esq.x + 11, btn_a_esq.y + 3))
+        tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_a_dir.x + 11, btn_a_dir.y + 3))
 
-        txt_inst = fonte_pista.render("(Clique nas linhas acima para alterar as opções)", True, COR_AMARELO)
-        tela.blit(txt_inst, (380, 380))
+        # Desenhar Botões < e > de Local
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_esq, border_radius=5)
+        pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_dir, border_radius=5)
+        tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_l_esq.x + 11, btn_l_esq.y + 3))
+        tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_l_dir.x + 11, btn_l_dir.y + 3))
 
-        btn_confirmar = pygame.Rect(380, 430, 210, 45)
+        # Rótulos e Texto Centralizado
+        txt_s_label = fonte_grelha.render("1. Suspeito:", True, COR_TEXTO)
+        tela.blit(txt_s_label, (370, 220))
+        txt_s_val = fonte_grelha.render(suspeitos[sel_suspeito], True, COR_AMARELO if categoria_foco == 0 else COR_TEXTO)
+        tela.blit(txt_s_val, (530, 220))
+
+        txt_a_label = fonte_grelha.render("2. Arma:", True, COR_TEXTO)
+        tela.blit(txt_a_label, (370, 280))
+        txt_a_val = fonte_grelha.render(armas[sel_arma], True, COR_AMARELO if categoria_foco == 1 else COR_TEXTO)
+        tela.blit(txt_a_val, (530, 280))
+
+        txt_l_label = fonte_grelha.render("3. Local:", True, COR_TEXTO)
+        tela.blit(txt_l_label, (370, 340))
+        txt_l_val = fonte_grelha.render(locais[sel_local], True, COR_AMARELO if categoria_foco == 2 else COR_TEXTO)
+        tela.blit(txt_l_val, (530, 340))
+
+        txt_inst = fonte_pista.render("Clique nos botões < > ou use as setas do teclado", True, COR_AMARELO)
+        tela.blit(txt_inst, (370, 385))
+
+        btn_confirmar = pygame.Rect(370, 430, 220, 45)
         pygame.draw.rect(tela, COR_VERDE, btn_confirmar, border_radius=8)
         txt_conf = fonte_titulo.render("CONFIRMAR", True, COR_TEXTO)
-        tela.blit(txt_conf, (btn_confirmar.x + 45, btn_confirmar.y + 10))
+        tela.blit(txt_conf, (btn_confirmar.x + 50, btn_confirmar.y + 10))
 
-        btn_cancelar = pygame.Rect(610, 430, 210, 45)
+        btn_cancelar = pygame.Rect(610, 430, 220, 45)
         pygame.draw.rect(tela, COR_VERMELHO, btn_cancelar, border_radius=8)
         txt_canc = fonte_titulo.render("CANCELAR", True, COR_TEXTO)
-        tela.blit(txt_canc, (btn_cancelar.x + 55, btn_cancelar.y + 10))
+        tela.blit(txt_canc, (btn_cancelar.x + 60, btn_cancelar.y + 10))
 
-    # 5. MODAL DE FIM DE JOGO (PERGUNTA SE QUER JOGAR NOVAMENTE)
+    # 5. MODAL DE FIM DE JOGO
     if estado_jogo["jogo_encerrado"]:
         s_overlay = pygame.Surface((LARGURA, ALTURA))
         s_overlay.set_alpha(220)
@@ -251,7 +283,7 @@ while rodando:
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_fim, border_radius=12)
         pygame.draw.rect(tela, COR_VERDE, rect_fim, 3, border_radius=12)
 
-        txt_vit = fonte_titulo.render("🏆 CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
+        txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
         tela.blit(txt_vit, (350, 220))
 
         txt_sol = fonte_pista.render(
@@ -289,6 +321,25 @@ while rodando:
             elif modal_acusacao_aberto:
                 if evento.key == pygame.K_ESCAPE:
                     modal_acusacao_aberto = False
+                elif evento.key == pygame.K_UP:
+                    categoria_foco = (categoria_foco - 1) % 3
+                elif evento.key == pygame.K_DOWN:
+                    categoria_foco = (categoria_foco + 1) % 3
+                elif evento.key == pygame.K_LEFT:
+                    if categoria_foco == 0:
+                        sel_suspeito = (sel_suspeito - 1) % 4
+                    elif categoria_foco == 1:
+                        sel_arma = (sel_arma - 1) % 4
+                    elif categoria_foco == 2:
+                        sel_local = (sel_local - 1) % 4
+                elif evento.key == pygame.K_RIGHT:
+                    if categoria_foco == 0:
+                        sel_suspeito = (sel_suspeito + 1) % 4
+                    elif categoria_foco == 1:
+                        sel_arma = (sel_arma + 1) % 4
+                    elif categoria_foco == 2:
+                        sel_local = (sel_local + 1) % 4
+
             else:
                 if evento.key == pygame.K_1 and estado_jogo["pista_index"] < len(estado_jogo["pistas"]):
                     estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
@@ -299,7 +350,6 @@ while rodando:
         elif evento.type == pygame.MOUSEBUTTONDOWN:
             pos_mouse = evento.pos
 
-            # Eventos na tela de Vitória (Fim de Jogo)
             if estado_jogo["jogo_encerrado"]:
                 btn_reiniciar = pygame.Rect(360, 400, 220, 50)
                 btn_sair = pygame.Rect(600, 400, 220, 50)
@@ -310,17 +360,33 @@ while rodando:
                 elif btn_sair.collidepoint(pos_mouse):
                     rodando = False
 
-            # Eventos no Modal de Acusação
             elif modal_acusacao_aberto:
-                btn_confirmar = pygame.Rect(380, 430, 210, 45)
-                btn_cancelar = pygame.Rect(610, 430, 210, 45)
+                btn_confirmar = pygame.Rect(370, 430, 220, 45)
+                btn_cancelar = pygame.Rect(610, 430, 220, 45)
 
-                if pygame.Rect(380, 215, 300, 35).collidepoint(pos_mouse):
+                # CLIQUES PRECISOS NOS BOTÕES < E > DE SUSPEITO
+                if btn_s_esq.collidepoint(pos_mouse):
+                    sel_suspeito = (sel_suspeito - 1) % 4
+                    categoria_foco = 0
+                elif btn_s_dir.collidepoint(pos_mouse):
                     sel_suspeito = (sel_suspeito + 1) % 4
-                elif pygame.Rect(380, 275, 300, 35).collidepoint(pos_mouse):
+                    categoria_foco = 0
+
+                # CLIQUES PRECISOS NOS BOTÕES < E > DE ARMA
+                elif btn_a_esq.collidepoint(pos_mouse):
+                    sel_arma = (sel_arma - 1) % 4
+                    categoria_foco = 1
+                elif btn_a_dir.collidepoint(pos_mouse):
                     sel_arma = (sel_arma + 1) % 4
-                elif pygame.Rect(380, 335, 300, 35).collidepoint(pos_mouse):
+                    categoria_foco = 1
+
+                # CLIQUES PRECISOS NOS BOTÕES < E > DE LOCAL
+                elif btn_l_esq.collidepoint(pos_mouse):
+                    sel_local = (sel_local - 1) % 4
+                    categoria_foco = 2
+                elif btn_l_dir.collidepoint(pos_mouse):
                     sel_local = (sel_local + 1) % 4
+                    categoria_foco = 2
 
                 elif btn_confirmar.collidepoint(pos_mouse):
                     modal_acusacao_aberto = False
@@ -331,7 +397,7 @@ while rodando:
                     if s_palpite == estado_jogo["culpado"] and a_palpite == estado_jogo["arma_real"] and l_palpite == estado_jogo["local_real"]:
                         estado_jogo["mensagem_resultado"] = "SOLUÇÃO CORRETA!"
                         estado_jogo["cor_resultado"] = COR_VERDE
-                        estado_jogo["jogo_encerrado"] = True  # Ativa a tela de reinício
+                        estado_jogo["jogo_encerrado"] = True
                     else:
                         estado_jogo["mensagem_resultado"] = "ACUSAÇÃO FALSA (F)! Tente novamente."
                         estado_jogo["cor_resultado"] = COR_VERMELHO
@@ -339,7 +405,6 @@ while rodando:
                 elif btn_cancelar.collidepoint(pos_mouse):
                     modal_acusacao_aberto = False
 
-            # Eventos de jogo normal (Grelha e Botões)
             else:
                 if btn_pedir_pista.collidepoint(pos_mouse):
                     if estado_jogo["pista_index"] < len(estado_jogo["pistas"]):
