@@ -47,3 +47,14 @@ No terminal do seu editor (ou prompt de comando), execute:
 
 ```bash
 python -m pip install pygame-ce
+```
+## Controles e Jogabilidade
+Pedir Pista: Clique no botão PEDIR NOVA PISTA [1] ou pressione a tecla 1.
+
+**Preencher Grelha Digital:** Clique diretamente nas células da tabela no painel direito para alternar os estados (Vazio → X → V).
+
+**Fazer Acusação:** Clique no botão FAZER ACUSAÇÃO [2] ou pressione a tecla 2.
+
+**Navegar no Modal de Acusação:** Use as setas do teclado (↑↓←→) ou clique nos botões < e > na tela.
+
+**Confirmar / Cancelar:** Selecione as opções na tela ou pressione a tecla ESC para fechar modais.
