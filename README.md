@@ -26,7 +26,7 @@ A mecânica do jogo utiliza os conceitos fundamentais da Lógica Proposicional d
 | **Negação ($\neg$)** | `¬Motorista` | Elimina o Motorista (clique na célula correspondente para marcar `X`). |
 | **Condicional ($\rightarrow$)** | `Mordomo -> ¬Veneno` | Se o culpado for o Mordomo, por *Modus Ponens*, a arma não foi o Veneno. |
 | **Bicondicional ($\leftrightarrow$)** | `Mordomo <-> Veneno` | O culpado e a arma têm obrigatoriamente o mesmo valor-verdade. |
-| **Lei de De Morgan ($\neg(P \lor Q)$)** | `¬(Jardineiro v Motorista)` | Equivale a $\neg P \land \neg Q$. Elimina o Jardineiro **E** o Motorista de uma só vez. |
+| **Lei de De Morgan ($\neg(P\lorQ)$)** | `¬(Jardineiro v Motorista)` | Equivale a $\neg P \land \neg Q$. Elimina o Jardineiro **E** o Motorista de uma só vez. |
 
 ---
 
@@ -49,7 +49,7 @@ No terminal do seu editor (ou prompt de comando), execute:
 python -m pip install pygame-ce
 ```
 ## Controles e Jogabilidade
-Pedir Pista: Clique no botão PEDIR NOVA PISTA [1] ou pressione a tecla 1.
+**Pedir Pista:** Clique no botão PEDIR NOVA PISTA [1] ou pressione a tecla 1.
 
 **Preencher Grelha Digital:** Clique diretamente nas células da tabela no painel direito para alternar os estados (Vazio → X → V).
 
