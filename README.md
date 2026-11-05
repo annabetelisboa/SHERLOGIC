@@ -1,6 +1,6 @@
 # SHERLOGIC — O Enigma da Lógica Proposicional
 
-**SherLogic** é um jogo de dedução digital desenvolvido em Python com a biblioteca **Pygame CE** para a disciplina de Lógica Proposicional.
+**SherLogic** é um jogo de dedução digital desenvolvido em Python com a biblioteca **Pygame CE**.
 
 O jogo coloca os participantes no papel de detetives que precisam de solucionar um mistério utilizando **regras de inferência, equivalências lógicas e tabelas-verdade** para descobrir a combinação secreta de **Culpado**, **Arma** e **Local**.
 
