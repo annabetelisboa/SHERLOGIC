@@ -1,0 +1,1 @@
+carregar_imagem
