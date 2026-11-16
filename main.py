@@ -84,6 +84,7 @@ def iniciar_novo_jogo():
         "pistas": pistas,
         "pistas_reveladas": [],
         "pista_index": 0,
+        "tentativas_acusacao": 0,
         "grelha_unica": [[0 for _ in range(4)] for _ in range(8)],
         "mensagem_resultado": "",
         "cor_resultado": (240, 240, 240),
@@ -94,7 +95,7 @@ def iniciar_novo_jogo():
 
 def limite_pistas_fase(fase):
     """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
-    return max(5, 10 - (fase - 1))
+    return 10 if fase == 1 else max(5, 10 - (fase - 1))
 
 def tempo_limite_fase(fase):
     return max(10, 60 - (fase - 1) * 10)
@@ -102,7 +103,7 @@ def tempo_limite_fase(fase):
 # INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
 pygame.init()
 LARGURA, ALTURA = 1200, 720
-tela = pygame.display.set_mode((LARGURA, ALTURA))
+tela = pygame.display.set_mode((LARGURA, ALTURA), pygame.FULLSCREEN | pygame.SCALED)
 pygame.display.set_caption("SHERLOGIC - Painel de Investigação")
 clock = pygame.time.Clock()
 
@@ -137,6 +138,8 @@ imgs_suspeitos_modal = {
     "Jardineiro": carregar_imagem("jardineiro.jpg", (90, 90)),
     "Motorista": carregar_imagem("motorista.jpg", (90, 90))
 }
+
+img_fim_de_jogo = carregar_imagem("fim_de_jogo.jpg", (400, 225))
 
 # Paleta de arquivo policial: papel quente, tinta escura e detalhes em latão.
 COR_ESQUERDA = (35, 43, 48)
@@ -187,6 +190,7 @@ sel_suspeito = 0
 sel_arma = 0
 sel_local = 0
 categoria_foco = 0
+pistas_scroll = 0
 
 estado_jogo = iniciar_novo_jogo()
 
@@ -359,23 +363,30 @@ while rodando:
             f"PISTAS: {estado_jogo['pista_index']}/{limite_pistas_fase(nivel_atual)}   •   CASOS: {casos_resolvidos}",
             True, COR_TEXTO)
         tela.blit(txt_contagem, (20, 70))
+        txt_tentativas = fonte_pista.render(
+            f"TENTATIVAS DE ACUSAÇÃO: {3 - estado_jogo['tentativas_acusacao']}/3",
+            True, COR_TEXTO
+        )
+        tela.blit(txt_tentativas, (20, 86))
         cor_tempo = COR_VERMELHO if tempo_restante <= 10 else COR_AMARELO
         txt_tempo = fonte_grelha.render(f"TEMPO: {tempo_restante // 60:02d}:{tempo_restante % 60:02d}", True, cor_tempo)
         tela.blit(txt_tempo, (350, 70))
-        y_pista = 100
+        area_pistas = pygame.Rect(10, 105, 480, 410)
+        tela.set_clip(area_pistas)
+        y_pista = area_pistas.top - pistas_scroll
         for i, p in enumerate(estado_jogo["pistas_reveladas"]):
-            if y_pista > 490:
-                break
-            altura_card = 24 + fonte_pista.get_height() * 3
-            pygame.draw.rect(tela, COR_CARTAO, (14, y_pista - 4, 472, altura_card), border_radius=8)
-            pygame.draw.rect(tela, COR_LINHA_DIVISORA, (14, y_pista - 4, 4, altura_card), border_radius=3)
+            historia = f'"{p["historia"]}"'
+            altura_texto = desenhar_texto_multilinhas(
+                tela, historia, 28, y_pista + 22, 440, fonte_pista, COR_TEXTO
+            )
+            altura_card = max(48, altura_texto - y_pista + 5)
+            pygame.draw.rect(tela, COR_CARTAO, (14, y_pista - 3, 472, altura_card), border_radius=8)
+            pygame.draw.rect(tela, COR_LINHA_DIVISORA, (14, y_pista - 3, 4, altura_card), border_radius=3)
             txt_f = fonte_grelha.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
             tela.blit(txt_f, (26, y_pista))
-            y_pista += 18
-
-            y_pista = desenhar_texto_multilinhas(tela, f"\"{p['historia']}\"", 20, y_pista, 450, fonte_pista, COR_TEXTO)
-            y_pista += 6
-
+            desenhar_texto_multilinhas(tela, historia, 28, y_pista + 22, 440, fonte_pista, COR_TEXTO)
+            y_pista += altura_card + 10
+        tela.set_clip(None)
         if estado_jogo["mensagem_resultado"]:
             txt_res = fonte_grelha.render(estado_jogo["mensagem_resultado"], True, estado_jogo["cor_resultado"])
             tela.blit(txt_res, (20, 530))
@@ -509,38 +520,44 @@ while rodando:
             s_overlay.fill((0, 0, 0))
             tela.blit(s_overlay, (0, 0))
 
-            rect_box = pygame.Rect(320, 150, 560, 400)
+            tempo_esgotado = estado_jogo["mensagem_resultado"].startswith(("TEMPO ESGOTADO", "ACABARAM AS TENTATIVAS"))
+            rect_box = pygame.Rect(320, 85, 560, 550) if tempo_esgotado else pygame.Rect(320, 150, 560, 400)
             pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=12)
             pygame.draw.rect(tela, COR_AMARELO, rect_box, 2, border_radius=12)
 
-            txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
-            tela.blit(txt_vit, (350, 200))
-
-            img_culpado = imgs_suspeitos_modal.get(estado_jogo["culpado"])
-            if img_culpado:
-                tela.blit(img_culpado, (555, 240))
-
-            txt_sol = fonte_pista.render(
-                f"Culpado: {estado_jogo['culpado']}  |  Arma: {estado_jogo['arma_real']}  |  Local: {estado_jogo['local_real']}",
-                True, COR_AMARELO
-            )
-            tela.blit(txt_sol, (350, 345))
-
-            txt_perg = fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO)
-            tela.blit(txt_perg, (440, 380))
-
-            btn_reiniciar = pygame.Rect(360, 430, 220, 50)
-            pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=8)
-            txt_re = fonte_titulo.render("PRÓXIMA FASE", True, COR_TEXTO)
-            tela.blit(txt_re, (btn_reiniciar.x + 48, btn_reiniciar.y + 12))
-            txt_prox = fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO)
-            tela.blit(txt_prox, (440, 410))
-
-            btn_sair = pygame.Rect(600, 430, 220, 50)
-            pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
-            txt_sa = fonte_titulo.render("SAIR", True, COR_TEXTO)
-            tela.blit(txt_sa, (btn_sair.x + 18, btn_sair.y + 12))
-
+            if tempo_esgotado:
+                if img_fim_de_jogo:
+                    tela.blit(img_fim_de_jogo, (400, 110))
+                else:
+                    tela.blit(fonte_titulo.render("FIM DE JOGO", True, COR_VERMELHO), (515, 125))
+                mensagem_fim = "ACABARAM AS TENTATIVAS!" if estado_jogo["mensagem_resultado"].startswith("ACABARAM AS TENTATIVAS") else "TEMPO ESGOTADO!"
+                tela.blit(fonte_titulo.render(mensagem_fim, True, COR_VERMELHO), (500, 350))
+                tela.blit(fonte_titulo.render("Deseja jogar novamente?", True, COR_TEXTO), (460, 390))
+                btn_reiniciar = pygame.Rect(360, 470, 220, 50)
+                btn_sair = pygame.Rect(600, 470, 220, 50)
+                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=8)
+                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
+                tela.blit(fonte_titulo.render("JOGAR NOVAMENTE", True, COR_TEXTO), (btn_reiniciar.x + 14, btn_reiniciar.y + 12))
+                tela.blit(fonte_titulo.render("SAIR DO JOGO", True, COR_TEXTO), (btn_sair.x + 35, btn_sair.y + 12))
+            else:
+                txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
+                tela.blit(txt_vit, (350, 200))
+                img_culpado = imgs_suspeitos_modal.get(estado_jogo["culpado"])
+                if img_culpado:
+                    tela.blit(img_culpado, (555, 240))
+                txt_sol = fonte_pista.render(
+                    f"Culpado: {estado_jogo['culpado']}  |  Arma: {estado_jogo['arma_real']}  |  Local: {estado_jogo['local_real']}",
+                    True, COR_AMARELO
+                )
+                tela.blit(txt_sol, (350, 345))
+                tela.blit(fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO), (440, 380))
+                btn_reiniciar = pygame.Rect(360, 430, 220, 50)
+                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=8)
+                tela.blit(fonte_titulo.render("PRÓXIMA FASE", True, COR_TEXTO), (btn_reiniciar.x + 48, btn_reiniciar.y + 12))
+                tela.blit(fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO), (440, 410))
+                btn_sair = pygame.Rect(600, 430, 220, 50)
+                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
+                tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + 18, btn_sair.y + 12))
     # TELA DE RANKING FINAL (SAIR DO JOGO)
     elif etapa_atual == "RANKING_FINAL":
         tela.fill(COR_ESQUERDA)
@@ -573,6 +590,10 @@ while rodando:
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             rodando = False
+
+        elif evento.type == pygame.MOUSEWHEEL and etapa_atual == "JOGO":
+            max_scroll = max(0, len(estado_jogo["pistas_reveladas"]) * 100 - 410)
+            pistas_scroll = max(0, min(max_scroll, pistas_scroll - evento.y * 35))
 
         elif evento.type == pygame.KEYDOWN:
             if etapa_atual == "NOME":
@@ -641,6 +662,7 @@ while rodando:
                 elif btn_nao.collidepoint(pos_mouse):
                     etapa_atual = "JOGO"
                     estado_jogo = iniciar_novo_jogo()
+                    pistas_scroll = 0
 
             elif etapa_atual == "TUTORIAL":
                 btn_prox = pygame.Rect(750, 530, 220, 45)
@@ -650,15 +672,20 @@ while rodando:
                     else:
                         etapa_atual = "JOGO"
                         estado_jogo = iniciar_novo_jogo()
+                        pistas_scroll = 0
 
             elif etapa_atual == "JOGO":
                 if estado_jogo["jogo_encerrado"]:
-                    btn_reiniciar = pygame.Rect(360, 430, 220, 50)
-                    btn_sair = pygame.Rect(600, 430, 220, 50)
+                    tempo_esgotado = estado_jogo["mensagem_resultado"].startswith(("TEMPO ESGOTADO", "ACABARAM AS TENTATIVAS"))
+                    y_botoes = 470 if tempo_esgotado else 430
+                    btn_reiniciar = pygame.Rect(360, y_botoes, 220, 50)
+                    btn_sair = pygame.Rect(600, y_botoes, 220, 50)
 
                     if btn_reiniciar.collidepoint(pos_mouse):
-                        nivel_atual += 1
+                        if not tempo_esgotado:
+                            nivel_atual += 1
                         estado_jogo = iniciar_novo_jogo()
+                        pistas_scroll = 0
                         modal_acusacao_aberto = False
                     elif btn_sair.collidepoint(pos_mouse):
                         etapa_atual = "RANKING_FINAL"
@@ -706,8 +733,14 @@ while rodando:
                             estado_jogo["cor_resultado"] = COR_VERDE
                             estado_jogo["jogo_encerrado"] = True
                         else:
-                            estado_jogo["mensagem_resultado"] = "ACUSAÇÃO FALSA (F)! Tente novamente."
+                            estado_jogo["tentativas_acusacao"] += 1
                             estado_jogo["cor_resultado"] = COR_VERMELHO
+                            if estado_jogo["tentativas_acusacao"] >= 3:
+                                estado_jogo["mensagem_resultado"] = "ACABARAM AS TENTATIVAS! O caso foi encerrado."
+                                estado_jogo["jogo_encerrado"] = True
+                            else:
+                                restantes = 3 - estado_jogo["tentativas_acusacao"]
+                                estado_jogo["mensagem_resultado"] = f"ACUSAÇÃO FALSA! Restam {restantes} tentativas."
 
                     elif btn_cancelar.collidepoint(pos_mouse):
                         modal_acusacao_aberto = False
