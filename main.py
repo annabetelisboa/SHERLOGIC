@@ -263,7 +263,7 @@ while rodando:
         txt_t = fonte_titulo.render(f"Olá, Detetive {nome_jogador}!", True, COR_AMARELO)
         tela.blit(txt_t, (380, 250))
 
-        txt_q = fonte_grelha.render("Deseja fazer o tutorial interativo?", True, COR_TEXTO)
+        txt_q = fonte_grelha.render("Deseja fazer o tutorial?", True, COR_TEXTO)
         tela.blit(txt_q, (380, 290))
 
         btn_sim = pygame.Rect(380, 360, 200, 50)
