@@ -684,6 +684,8 @@ while rodando:
                     if btn_reiniciar.collidepoint(pos_mouse):
                         if not tempo_esgotado:
                             nivel_atual += 1
+                        else:
+                            nivel_atual = 1
                         estado_jogo = iniciar_novo_jogo()
                         pistas_scroll = 0
                         modal_acusacao_aberto = False
