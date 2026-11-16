@@ -61,6 +61,18 @@ def iniciar_novo_jogo():
         }
     ]
     random.shuffle(pistas)
+    if nivel_atual >= 3:
+        pistas.extend([
+            {
+                "historia": f"A perícia concluiu: se {arma_real} foi usada, então o crime ocorreu na {local_real}; além disso, a arma ligada ao culpado foi encontrada na cena.",
+                "formula": f"({arma_real} -> {local_real}) ^ ({culpado} <-> {arma_real})"
+            },
+            {
+                "historia": f"Dois registros coincidem: {culpado} é o autor se, e somente se, {arma_real} foi usada; sem {arma_real}, o crime não poderia ter ocorrido na {local_real}.",
+                "formula": f"({culpado} <-> {arma_real}) ^ (¬{arma_real} -> ¬{local_real})"
+            }
+        ])
+        random.shuffle(pistas)
 
     return {
         "suspeitos": suspeitos,
@@ -76,12 +88,16 @@ def iniciar_novo_jogo():
         "mensagem_resultado": "",
         "cor_resultado": (240, 240, 240),
         "tempo_inicio": time.time(),
+        "tempo_limite": max(10, 60 - (nivel_atual - 1) * 10),
         "jogo_encerrado": False
     }
 
 def limite_pistas_fase(fase):
     """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
     return max(5, 10 - (fase - 1))
+
+def tempo_limite_fase(fase):
+    return max(10, 60 - (fase - 1) * 10)
 
 # INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
 pygame.init()
@@ -311,6 +327,14 @@ while rodando:
 
     # TELA PRINCIPAL DO JOGO
     elif etapa_atual == "JOGO":
+        if not estado_jogo["jogo_encerrado"]:
+            tempo_restante = max(0, int(estado_jogo["tempo_limite"] - (time.time() - estado_jogo["tempo_inicio"])))
+            if tempo_restante == 0:
+                estado_jogo["jogo_encerrado"] = True
+                estado_jogo["mensagem_resultado"] = "TEMPO ESGOTADO! O caso foi encerrado."
+                estado_jogo["cor_resultado"] = COR_VERMELHO
+        else:
+            tempo_restante = 0
         tela.fill(COR_DIREITA)
         suspeitos = estado_jogo["suspeitos"]
         armas = estado_jogo["armas"]
@@ -335,6 +359,9 @@ while rodando:
             f"PISTAS: {estado_jogo['pista_index']}/{limite_pistas_fase(nivel_atual)}   •   CASOS: {casos_resolvidos}",
             True, COR_TEXTO)
         tela.blit(txt_contagem, (20, 70))
+        cor_tempo = COR_VERMELHO if tempo_restante <= 10 else COR_AMARELO
+        txt_tempo = fonte_grelha.render(f"TEMPO: {tempo_restante // 60:02d}:{tempo_restante % 60:02d}", True, cor_tempo)
+        tela.blit(txt_tempo, (350, 70))
         y_pista = 100
         for i, p in enumerate(estado_jogo["pistas_reveladas"]):
             if y_pista > 490:
