@@ -3,6 +3,16 @@ import random
 import sys
 import os
 import time
+import ctypes
+
+# Ativa nitidez nativa no Windows (evita zoom borrado de DPI)
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
 
 
 # FUNÇÃO PARA REINICIAR O JOGO
@@ -105,10 +115,38 @@ def tempo_limite_fase(fase):
     return max(30, 90 - (fase - 1) * 10)
 
 
-# INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
+# INICIALIZAÇÃO DO PYGAME EM TELA CHEIA COM ESCALA NATIVA NÍTIDA
 pygame.init()
-LARGURA, ALTURA = 1200, 720
-tela = pygame.display.set_mode((LARGURA, ALTURA), pygame.FULLSCREEN | pygame.SCALED)
+info_monitor = pygame.display.Info()
+LARGURA = info_monitor.current_w
+ALTURA = info_monitor.current_h
+
+ESCALA = min(LARGURA / 1200.0, ALTURA / 720.0)
+MARGEM_X = (LARGURA - 1200 * ESCALA) / 2.0
+MARGEM_Y = (ALTURA - 720 * ESCALA) / 2.0
+
+
+def sx(x):
+    return int(round(MARGEM_X + x * ESCALA))
+
+
+def sy(y):
+    return int(round(MARGEM_Y + y * ESCALA))
+
+
+def sw(w):
+    return int(round(w * ESCALA))
+
+
+def sh(h):
+    return int(round(h * ESCALA))
+
+
+def srect(x, y, w, h):
+    return pygame.Rect(sx(x), sy(y), sw(w), sh(h))
+
+
+tela = pygame.display.set_mode((LARGURA, ALTURA), pygame.FULLSCREEN)
 pygame.display.set_caption("SHERLOGIC - Painel de Investigação")
 clock = pygame.time.Clock()
 
@@ -116,12 +154,13 @@ clock = pygame.time.Clock()
 def carregar_imagem(caminho, tamanho):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
     nome_base = os.path.splitext(caminho)[0]
+    tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
     for extensao in (".jpeg", ".jpg", ".png", ".JPEG", ".JPG", ".PNG"):
         caminho_completo = os.path.join(diretorio_base, nome_base + extensao)
         if os.path.exists(caminho_completo):
             try:
                 img = pygame.image.load(caminho_completo).convert_alpha()
-                return pygame.transform.smoothscale(img, tamanho)
+                return pygame.transform.smoothscale(img, tamanho_escalado)
             except pygame.error:
                 return None
     return None
@@ -145,34 +184,35 @@ imgs_suspeitos_modal = {
 }
 img_fim_de_jogo = carregar_imagem("fim_de_jogo.jpg", (400, 225))
 
-# Paleta de arquivo policial: papel quente, tinta escura e detalhes em latão.
-COR_ESQUERDA = (35, 43, 48)
+# Paleta de arquivo policial com alto contraste para leitura nítida
+COR_ESQUERDA = (32, 40, 45)
 COR_DIREITA = (24, 31, 36)
 COR_LINHA_DIVISORA = (89, 104, 105)
-COR_TEXTO = (236, 232, 216)
-COR_AMARELO = (211, 169, 91)
+COR_TEXTO = (255, 255, 255)
+COR_AMARELO = (235, 192, 108)
 COR_BOTAO_PISTA = (56, 105, 117)
 COR_BOTAO_ACUSAR = (151, 69, 57)
 COR_BOTAO_SAIR = (94, 49, 45)
-COR_VERMELHO = (196, 83, 70)
-COR_VERDE = (82, 143, 105)
+COR_VERMELHO = (212, 88, 74)
+COR_VERDE = (86, 156, 114)
 COR_CELULA = (39, 50, 54)
 COR_DIVISOR_TABELA = (93, 111, 109)
-COR_MODAL_FUNDO = (28, 36, 40)
+COR_MODAL_FUNDO = (26, 34, 38)
 COR_BOTAO_SETA = (57, 73, 78)
 COR_CAMPO_TEXTO = (39, 50, 54)
-COR_CARTAO = (43, 53, 56)
+COR_CARTAO = (22, 29, 33)
 
-# Configuração de Fontes
-fonte_titulo = pygame.font.SysFont("arial", 20, bold=True)
-fonte_pista = pygame.font.SysFont("arial", 13)
-fonte_grelha = pygame.font.SysFont("arial", 13, bold=True)
-fonte_tutorial = pygame.font.SysFont("arial", 15)
+# Fontes renderizadas diretamente na resolução nativa do monitor (nitidez 100%)
+fonte_titulo = pygame.font.SysFont("segoeui,arial", max(14, int(21 * ESCALA)), bold=True)
+fonte_pista = pygame.font.SysFont("segoeui,calibri,arial", max(12, int(16 * ESCALA)))
+fonte_formula = pygame.font.SysFont("consolas,segoeui,arial", max(11, int(15 * ESCALA)), bold=True)
+fonte_grelha = pygame.font.SysFont("segoeui,arial", max(11, int(14 * ESCALA)), bold=True)
+fonte_tutorial = pygame.font.SysFont("segoeui,arial", max(12, int(16 * ESCALA)))
 
-# Botões Painel Esquerdo
-btn_pedir_pista = pygame.Rect(20, 560, 460, 38)
-btn_acusar = pygame.Rect(20, 605, 460, 38)
-btn_sair_jogo = pygame.Rect(20, 650, 460, 35)
+# Botões Painel Esquerdo (coordenadas lógicas 1200x720)
+btn_pedir_pista = srect(20, 560, 460, 38)
+btn_acusar = srect(20, 605, 460, 38)
+btn_sair_jogo = srect(20, 650, 460, 35)
 
 tam_celula = 50
 ox = 740
@@ -203,34 +243,38 @@ altura_total_pistas = 0
 estado_jogo = iniciar_novo_jogo()
 
 
-def desenhar_texto_multilinhas(superficie, texto, x, y, largura_max, fonte, cor):
+def desenhar_texto_multilinhas(superficie, texto, x_logico, y_logico, largura_max_logica, fonte, cor, desenhar=True):
     palavras = texto.split(' ')
     linhas = []
     linha_atual = ""
+    largura_max_real = sw(largura_max_logica)
 
     for palavra in palavras:
         test_line = linha_atual + palavra + " "
-        if fonte.size(test_line)[0] <= largura_max:
+        if fonte.size(test_line)[0] <= largura_max_real:
             linha_atual = test_line
         else:
             linhas.append(linha_atual)
             linha_atual = palavra + " "
     linhas.append(linha_atual)
 
-    altura_y = y
+    altura_y = y_logico
+    passo_linha = (fonte.get_height() / ESCALA) + 5
     for linha in linhas:
-        txt_surface = fonte.render(linha.strip(), True, cor)
-        superficie.blit(txt_surface, (x, altura_y))
-        altura_y += fonte.get_height() + 2
+        if desenhar:
+            txt_surface = fonte.render(linha.strip(), True, cor)
+            superficie.blit(txt_surface, (sx(x_logico), sy(altura_y)))
+        altura_y += passo_linha
     return altura_y
 
 
-def desenhar_linhas_tutorial(superficie, linhas_texto, x, y, fonte, cor):
-    altura_y = y
+def desenhar_linhas_tutorial(superficie, linhas_texto, x_logico, y_logico, fonte, cor):
+    altura_y = y_logico
+    passo_linha = (fonte.get_height() / ESCALA) + 12
     for linha in linhas_texto:
         txt_surface = fonte.render(linha, True, cor)
-        superficie.blit(txt_surface, (x, altura_y))
-        altura_y += fonte.get_height() + 12
+        superficie.blit(txt_surface, (sx(x_logico), sy(altura_y)))
+        altura_y += passo_linha
 
 
 # Loop Principal
@@ -240,62 +284,62 @@ while rodando:
     if etapa_atual == "NOME":
         tela.fill(COR_ESQUERDA)
 
-        rect_box = pygame.Rect(350, 200, 500, 300)
-        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=12)
-        pygame.draw.rect(tela, COR_AMARELO, rect_box, 2, border_radius=12)
+        rect_box = srect(350, 200, 500, 300)
+        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
+        pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
         txt_t = fonte_titulo.render("BEM-VINDO AO SHERLOGIC", True, COR_AMARELO)
-        tela.blit(txt_t, (380, 230))
+        tela.blit(txt_t, (sx(380), sy(230)))
 
         txt_sub = fonte_grelha.render("Digite o seu nome de detetive:", True, COR_TEXTO)
-        tela.blit(txt_sub, (380, 280))
+        tela.blit(txt_sub, (sx(380), sy(280)))
 
-        rect_input = pygame.Rect(380, 320, 440, 45)
-        pygame.draw.rect(tela, COR_CAMPO_TEXTO, rect_input, border_radius=6)
-        pygame.draw.rect(tela, COR_LINHA_DIVISORA, rect_input, 1, border_radius=6)
+        rect_input = srect(380, 320, 440, 45)
+        pygame.draw.rect(tela, COR_CAMPO_TEXTO, rect_input, border_radius=sw(6))
+        pygame.draw.rect(tela, COR_LINHA_DIVISORA, rect_input, 1, border_radius=sw(6))
 
         txt_nome = fonte_titulo.render(nome_jogador + "|", True, COR_AMARELO)
-        tela.blit(txt_nome, (rect_input.x + 15, rect_input.y + 10))
+        tela.blit(txt_nome, (rect_input.x + sw(15), rect_input.y + sh(10)))
 
-        btn_avancar = pygame.Rect(380, 400, 440, 45)
-        pygame.draw.rect(tela, COR_VERDE, btn_avancar, border_radius=8)
+        btn_avancar = srect(380, 400, 440, 45)
+        pygame.draw.rect(tela, COR_VERDE, btn_avancar, border_radius=sw(8))
         txt_av = fonte_titulo.render("CONTINUAR", True, COR_TEXTO)
-        tela.blit(txt_av, (btn_avancar.x + 160, btn_avancar.y + 10))
+        tela.blit(txt_av, (btn_avancar.x + sw(160), btn_avancar.y + sh(10)))
 
     # TELA DE PERGUNTA DO TUTORIAL
     elif etapa_atual == "PERGUNTA_TUTORIAL":
         tela.fill(COR_ESQUERDA)
 
-        rect_box = pygame.Rect(350, 220, 500, 260)
-        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=12)
-        pygame.draw.rect(tela, COR_AMARELO, rect_box, 2, border_radius=12)
+        rect_box = srect(350, 220, 500, 260)
+        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
+        pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
         txt_t = fonte_titulo.render(f"Olá, Detetive {nome_jogador}!", True, COR_AMARELO)
-        tela.blit(txt_t, (380, 250))
+        tela.blit(txt_t, (sx(380), sy(250)))
 
         txt_q = fonte_grelha.render("Deseja fazer o tutorial?", True, COR_TEXTO)
-        tela.blit(txt_q, (380, 290))
+        tela.blit(txt_q, (sx(380), sy(290)))
 
-        btn_sim = pygame.Rect(380, 360, 200, 50)
-        pygame.draw.rect(tela, COR_VERDE, btn_sim, border_radius=8)
+        btn_sim = srect(380, 360, 200, 50)
+        pygame.draw.rect(tela, COR_VERDE, btn_sim, border_radius=sw(8))
         txt_s = fonte_titulo.render("SIM", True, COR_TEXTO)
-        tela.blit(txt_s, (btn_sim.x + 85, btn_sim.y + 12))
+        tela.blit(txt_s, (btn_sim.x + sw(85), btn_sim.y + sh(12)))
 
-        btn_nao = pygame.Rect(620, 360, 200, 50)
-        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_nao, border_radius=8)
+        btn_nao = srect(620, 360, 200, 50)
+        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_nao, border_radius=sw(8))
         txt_n = fonte_titulo.render("NÃO", True, COR_TEXTO)
-        tela.blit(txt_n, (btn_nao.x + 80, btn_nao.y + 12))
+        tela.blit(txt_n, (btn_nao.x + sw(80), btn_nao.y + sh(12)))
 
     # TELA DE TUTORIAL
     elif etapa_atual == "TUTORIAL":
         tela.fill(COR_ESQUERDA)
 
-        rect_tut = pygame.Rect(200, 100, 800, 500)
-        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_tut, border_radius=12)
-        pygame.draw.rect(tela, COR_AMARELO, rect_tut, 2, border_radius=12)
+        rect_tut = srect(200, 100, 800, 500)
+        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_tut, border_radius=sw(12))
+        pygame.draw.rect(tela, COR_AMARELO, rect_tut, max(1, sw(2)), border_radius=sw(12))
 
         txt_tut_t = fonte_titulo.render(f"TUTORIAL - PARTE {passo_tutorial + 1} DE 3", True, COR_AMARELO)
-        tela.blit(txt_tut_t, (230, 130))
+        tela.blit(txt_tut_t, (sx(230), sy(130)))
 
         if passo_tutorial == 0:
             linhas_parte_1 = [
@@ -333,11 +377,11 @@ while rodando:
             ]
             desenhar_linhas_tutorial(tela, linhas_parte_3, 230, 180, fonte_tutorial, COR_TEXTO)
 
-        btn_prox = pygame.Rect(750, 530, 220, 45)
-        pygame.draw.rect(tela, COR_VERDE, btn_prox, border_radius=8)
+        btn_prox = srect(750, 530, 220, 45)
+        pygame.draw.rect(tela, COR_VERDE, btn_prox, border_radius=sw(8))
         lbl_btn = "AVANÇAR" if passo_tutorial < 2 else "INICIAR JOGO"
         txt_px = fonte_titulo.render(lbl_btn, True, COR_TEXTO)
-        tela.blit(txt_px, (btn_prox.x + 35, btn_prox.y + 10))
+        tela.blit(txt_px, (btn_prox.x + sw(35), btn_prox.y + sh(10)))
 
     # TELA PRINCIPAL DO JOGO
     elif etapa_atual == "JOGO":
@@ -351,7 +395,7 @@ while rodando:
         else:
             tempo_restante = 0
 
-        # Atualização suave da animação das pistas subindo (Ease-Out bem visível)
+        # Atualização suave da animação das pistas subindo (Ease-Out)
         pistas_scroll += (alvo_scroll - pistas_scroll) * 0.12
         if animacao_nova_pista_y > 0:
             animacao_nova_pista_y -= max(2.0, animacao_nova_pista_y * 0.08)
@@ -364,35 +408,35 @@ while rodando:
         itens_laterais = armas + locais
 
         # 1. METADE ESQUERDA (PISTAS E BOTÕES)
-        pygame.draw.rect(tela, COR_ESQUERDA, (0, 0, 500, ALTURA))
-        pygame.draw.rect(tela, COR_LINHA_DIVISORA, (0, 0, 500, 5))
+        pygame.draw.rect(tela, COR_ESQUERDA, (0, 0, sx(500), ALTURA))
+        pygame.draw.rect(tela, COR_LINHA_DIVISORA, (0, 0, sx(500), max(2, sh(5))))
 
         txt_tit1 = fonte_titulo.render("ARQUIVO DO CASO", True, COR_AMARELO)
-        tela.blit(txt_tit1, (20, 15))
+        tela.blit(txt_tit1, (sx(20), sy(15)))
 
         txt_p_info = fonte_grelha.render(
             f"FASE {nivel_atual}  |  Detetive: {nome_jogador}  |  {pontuacao_total} pts",
             True, COR_AMARELO
         )
-        tela.blit(txt_p_info, (20, 40))
+        tela.blit(txt_p_info, (sx(20), sy(40)))
 
-        pygame.draw.line(tela, COR_LINHA_DIVISORA, (20, 62), (480, 62), 1)
-        txt_contagem = fonte_pista.render(
+        pygame.draw.line(tela, COR_LINHA_DIVISORA, (sx(20), sy(62)), (sx(480), sy(62)), 1)
+        txt_contagem = fonte_grelha.render(
             f"PISTAS: {estado_jogo['pista_index']}/{limite_pistas_fase(nivel_atual)}   •   CASOS: {casos_resolvidos}",
             True, COR_TEXTO)
-        tela.blit(txt_contagem, (20, 70))
-        txt_tentativas = fonte_pista.render(
+        tela.blit(txt_contagem, (sx(20), sy(70)))
+        txt_tentativas = fonte_grelha.render(
             f"TENTATIVAS DE ACUSAÇÃO: {3 - estado_jogo['tentativas_acusacao']}/3",
             True, COR_TEXTO
         )
-        tela.blit(txt_tentativas, (20, 86))
+        tela.blit(txt_tentativas, (sx(20), sy(88)))
         cor_tempo = COR_VERMELHO if tempo_restante <= 10 else COR_AMARELO
         txt_tempo = fonte_grelha.render(f"TEMPO: {tempo_restante // 60:02d}:{tempo_restante % 60:02d}", True, cor_tempo)
-        tela.blit(txt_tempo, (350, 70))
+        tela.blit(txt_tempo, (sx(350), sy(70)))
 
-        area_pistas = pygame.Rect(10, 105, 480, 410)
+        area_pistas = srect(10, 114, 480, 401)
         tela.set_clip(area_pistas)
-        y_base = area_pistas.top - pistas_scroll
+        y_base = 114 - pistas_scroll
         altura_acumulada = 0
 
         for i, p in enumerate(estado_jogo["pistas_reveladas"]):
@@ -402,80 +446,84 @@ while rodando:
 
             historia = f'"{p["historia"]}"'
             altura_texto = desenhar_texto_multilinhas(
-                tela, historia, 28, y_atual + 22, 440, fonte_pista, COR_TEXTO
+                tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=False
             )
-            altura_card = max(48, altura_texto - y_atual + 5)
-            pygame.draw.rect(tela, COR_CARTAO, (14, y_atual - 3, 472, altura_card), border_radius=8)
-            pygame.draw.rect(tela, COR_LINHA_DIVISORA, (14, y_atual - 3, 4, altura_card), border_radius=3)
-            txt_f = fonte_grelha.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
-            tela.blit(txt_f, (26, y_atual))
-            desenhar_texto_multilinhas(tela, historia, 28, y_atual + 22, 440, fonte_pista, COR_TEXTO)
-            altura_acumulada += altura_card + 10
+            altura_card = max(60, altura_texto - y_atual + 8)
+            pygame.draw.rect(tela, COR_CARTAO, srect(14, y_atual - 3, 472, altura_card), border_radius=sw(8))
+            pygame.draw.rect(tela, COR_AMARELO, srect(14, y_atual - 3, 4, altura_card), border_radius=sw(3))
+            txt_f = fonte_formula.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
+            tela.blit(txt_f, (sx(28), sy(y_atual + 3)))
+            desenhar_texto_multilinhas(tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=True)
+            altura_acumulada += altura_card + 12
 
         altura_total_pistas = altura_acumulada
         tela.set_clip(None)
 
         if estado_jogo["mensagem_resultado"]:
             txt_res = fonte_grelha.render(estado_jogo["mensagem_resultado"], True, estado_jogo["cor_resultado"])
-            tela.blit(txt_res, (20, 530))
+            tela.blit(txt_res, (sx(20), sy(530)))
 
         # Botões Esquerda
-        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_pedir_pista, border_radius=8)
+        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_pedir_pista, border_radius=sw(8))
         txt_btn1 = fonte_titulo.render("PEDIR NOVA PISTA [1]", True, COR_TEXTO)
-        tela.blit(txt_btn1, (btn_pedir_pista.x + 115, btn_pedir_pista.y + 8))
+        tela.blit(txt_btn1, (btn_pedir_pista.x + sw(115), btn_pedir_pista.y + sh(8)))
 
-        pygame.draw.rect(tela, COR_BOTAO_ACUSAR, btn_acusar, border_radius=8)
+        pygame.draw.rect(tela, COR_BOTAO_ACUSAR, btn_acusar, border_radius=sw(8))
         txt_btn2 = fonte_titulo.render("FAZER ACUSAÇÃO [2]", True, COR_TEXTO)
-        tela.blit(txt_btn2, (btn_acusar.x + 125, btn_acusar.y + 8))
+        tela.blit(txt_btn2, (btn_acusar.x + sw(125), btn_acusar.y + sh(8)))
 
-        pygame.draw.rect(tela, COR_BOTAO_SAIR, btn_sair_jogo, border_radius=8)
+        pygame.draw.rect(tela, COR_BOTAO_SAIR, btn_sair_jogo, border_radius=sw(8))
         txt_btn3 = fonte_titulo.render("SAIR DO JOGO [ESC]", True, COR_TEXTO)
-        tela.blit(txt_btn3, (btn_sair_jogo.x + 130, btn_sair_jogo.y + 6))
+        tela.blit(txt_btn3, (btn_sair_jogo.x + sw(130), btn_sair_jogo.y + sh(6)))
 
-        # 2. DIVISÓRIA CENTRAL
-        pygame.draw.line(tela, COR_LINHA_DIVISORA, (500, 0), (500, ALTURA), 4)
-
-        # 3. METADE DIREITA (GRELHA DE DEDUÇÃO)
-        pygame.draw.rect(tela, COR_DIREITA, (500, 0, 700, ALTURA))
+        # 2. METADE DIREITA (GRELHA DE DEDUÇÃO)
+        pygame.draw.rect(tela, COR_DIREITA, (sx(500), 0, LARGURA - sx(500), ALTURA))
+        pygame.draw.line(tela, COR_LINHA_DIVISORA, (sx(500), 0), (sx(500), ALTURA), max(2, sw(4)))
 
         txt_tit2 = fonte_titulo.render("QUADRO DE DEDUÇÕES", True, COR_AMARELO)
-        tela.blit(txt_tit2, (520, 15))
-        pygame.draw.line(tela, COR_LINHA_DIVISORA, (520, 49), (710, 49), 2)
+        tela.blit(txt_tit2, (sx(520), sy(15)))
+        pygame.draw.line(tela, COR_LINHA_DIVISORA, (sx(520), sy(49)), (sx(710), sy(49)), max(1, sw(2)))
         txt_fase = fonte_pista.render(f"FASE {nivel_atual}  ·  DIFICULDADE {min(nivel_atual, 7)}/7", True, COR_TEXTO)
-        tela.blit(txt_fase, (520, 57))
+        tela.blit(txt_fase, (sx(520), sy(57)))
 
         if logo_img:
-            tela.blit(logo_img, (LARGURA - logo_img.get_width() - 20, 10))
+            tela.blit(logo_img, (LARGURA - logo_img.get_width() - sw(20), sy(10)))
 
         # Rótulos e fotos dos Suspeitos (Topo)
         for col in range(4):
             nome_s = suspeitos[col]
             img_s = imgs_suspeitos.get(nome_s)
             if img_s:
-                tela.blit(img_s, (ox + col * tam_celula + 2, oy - 75))
+                tela.blit(img_s, (sx(ox + col * tam_celula + 2), sy(oy - 75)))
             txt_col = fonte_grelha.render(nome_s[:4], True, COR_AMARELO)
-            tela.blit(txt_col, (ox + col * tam_celula + 10, oy - 25))
+            tela.blit(txt_col, (sx(ox + col * tam_celula + 10), sy(oy - 25)))
 
         # Desenho da Tabela
         for lin in range(8):
             cor_rotulo = COR_AMARELO if lin < 4 else COR_TEXTO
             txt_lin = fonte_grelha.render(itens_laterais[lin][:10], True, cor_rotulo)
-            tela.blit(txt_lin, (ox - 140, oy + lin * tam_celula + 16))
+            tela.blit(txt_lin, (sx(ox - 140), sy(oy + lin * tam_celula + 16)))
 
             for col in range(4):
-                rect = pygame.Rect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 2, tam_celula - 2)
-                pygame.draw.rect(tela, COR_CELULA, rect, border_radius=7)
-                pygame.draw.rect(tela, (61, 76, 78), rect, 1, border_radius=7)
+                rect = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 2, tam_celula - 2)
+                pygame.draw.rect(tela, COR_CELULA, rect, border_radius=sw(7))
+                pygame.draw.rect(tela, (61, 76, 78), rect, 1, border_radius=sw(7))
 
                 val = estado_jogo["grelha_unica"][lin][col]
                 if val == 1:
                     txt_x = fonte_titulo.render("X", True, COR_VERMELHO)
-                    tela.blit(txt_x, (rect.x + 17, rect.y + 12))
+                    tela.blit(txt_x, (rect.x + sw(17), rect.y + sh(12)))
                 elif val == 2:
                     txt_v = fonte_titulo.render("V", True, COR_VERDE)
-                    tela.blit(txt_v, (rect.x + 17, rect.y + 12))
+                    tela.blit(txt_v, (rect.x + sw(17), rect.y + sh(12)))
 
-        pygame.draw.line(tela, COR_DIVISOR_TABELA, (ox - 140, oy + 4 * tam_celula - 1), (ox + 4 * tam_celula, oy + 4 * tam_celula - 1), 3)
+        pygame.draw.line(
+            tela,
+            COR_DIVISOR_TABELA,
+            (sx(ox - 140), sy(oy + 4 * tam_celula - 1)),
+            (sx(ox + 4 * tam_celula), sy(oy + 4 * tam_celula - 1)),
+            max(2, sw(3))
+        )
 
         # 4. MODAL DE ACUSAÇÃO
         if modal_acusacao_aberto and not estado_jogo["jogo_encerrado"]:
@@ -484,62 +532,62 @@ while rodando:
             s_overlay.fill((0, 0, 0))
             tela.blit(s_overlay, (0, 0))
 
-            rect_modal = pygame.Rect(350, 150, 500, 400)
-            pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_modal, border_radius=12)
-            pygame.draw.rect(tela, COR_AMARELO, rect_modal, 2, border_radius=12)
+            rect_modal = srect(350, 150, 500, 400)
+            pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_modal, border_radius=sw(12))
+            pygame.draw.rect(tela, COR_AMARELO, rect_modal, max(1, sw(2)), border_radius=sw(12))
 
             txt_mod_tit = fonte_titulo.render("MONTE SUA ACUSAÇÃO", True, COR_AMARELO)
-            tela.blit(txt_mod_tit, (370, 170))
+            tela.blit(txt_mod_tit, (sx(370), sy(170)))
 
-            btn_s_esq = pygame.Rect(480, 215, 35, 30)
-            btn_s_dir = pygame.Rect(720, 215, 35, 30)
-            btn_a_esq = pygame.Rect(480, 275, 35, 30)
-            btn_a_dir = pygame.Rect(720, 275, 35, 30)
-            btn_l_esq = pygame.Rect(480, 335, 35, 30)
-            btn_l_dir = pygame.Rect(720, 335, 35, 30)
+            btn_s_esq = srect(480, 215, 35, 30)
+            btn_s_dir = srect(720, 215, 35, 30)
+            btn_a_esq = srect(480, 275, 35, 30)
+            btn_a_dir = srect(720, 275, 35, 30)
+            btn_l_esq = srect(480, 335, 35, 30)
+            btn_l_dir = srect(720, 335, 35, 30)
 
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_esq, border_radius=5)
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_dir, border_radius=5)
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_s_esq.x + 11, btn_s_esq.y + 3))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_s_dir.x + 11, btn_s_dir.y + 3))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_esq, border_radius=sw(5))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_dir, border_radius=sw(5))
+            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_s_esq.x + sw(11), btn_s_esq.y + sh(3)))
+            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_s_dir.x + sw(11), btn_s_dir.y + sh(3)))
 
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_esq, border_radius=5)
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_dir, border_radius=5)
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_a_esq.x + 11, btn_a_esq.y + 3))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_a_dir.x + 11, btn_a_dir.y + 3))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_esq, border_radius=sw(5))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_dir, border_radius=sw(5))
+            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_a_esq.x + sw(11), btn_a_esq.y + sh(3)))
+            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_a_dir.x + sw(11), btn_a_dir.y + sh(3)))
 
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_esq, border_radius=5)
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_dir, border_radius=5)
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_l_esq.x + 11, btn_l_esq.y + 3))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_l_dir.x + 11, btn_l_dir.y + 3))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_esq, border_radius=sw(5))
+            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_dir, border_radius=sw(5))
+            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_l_esq.x + sw(11), btn_l_esq.y + sh(3)))
+            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_l_dir.x + sw(11), btn_l_dir.y + sh(3)))
 
             txt_s_label = fonte_grelha.render("1. Suspeito:", True, COR_TEXTO)
-            tela.blit(txt_s_label, (370, 220))
+            tela.blit(txt_s_label, (sx(370), sy(220)))
             txt_s_val = fonte_grelha.render(suspeitos[sel_suspeito], True, COR_AMARELO if categoria_foco == 0 else COR_TEXTO)
-            tela.blit(txt_s_val, (530, 220))
+            tela.blit(txt_s_val, (sx(530), sy(220)))
 
             txt_a_label = fonte_grelha.render("2. Arma:", True, COR_TEXTO)
-            tela.blit(txt_a_label, (370, 280))
+            tela.blit(txt_a_label, (sx(370), sy(280)))
             txt_a_val = fonte_grelha.render(armas[sel_arma], True, COR_AMARELO if categoria_foco == 1 else COR_TEXTO)
-            tela.blit(txt_a_val, (530, 280))
+            tela.blit(txt_a_val, (sx(530), sy(280)))
 
             txt_l_label = fonte_grelha.render("3. Local:", True, COR_TEXTO)
-            tela.blit(txt_l_label, (370, 340))
+            tela.blit(txt_l_label, (sx(370), sy(340)))
             txt_l_val = fonte_grelha.render(locais[sel_local], True, COR_AMARELO if categoria_foco == 2 else COR_TEXTO)
-            tela.blit(txt_l_val, (530, 340))
+            tela.blit(txt_l_val, (sx(530), sy(340)))
 
             txt_inst = fonte_pista.render("Clique nos botões < > ou use as setas do teclado", True, COR_AMARELO)
-            tela.blit(txt_inst, (370, 385))
+            tela.blit(txt_inst, (sx(370), sy(385)))
 
-            btn_confirmar = pygame.Rect(370, 430, 220, 45)
-            pygame.draw.rect(tela, COR_VERDE, btn_confirmar, border_radius=8)
+            btn_confirmar = srect(370, 430, 220, 45)
+            pygame.draw.rect(tela, COR_VERDE, btn_confirmar, border_radius=sw(8))
             txt_conf = fonte_titulo.render("CONFIRMAR", True, COR_TEXTO)
-            tela.blit(txt_conf, (btn_confirmar.x + 50, btn_confirmar.y + 10))
+            tela.blit(txt_conf, (btn_confirmar.x + sw(50), btn_confirmar.y + sh(10)))
 
-            btn_cancelar = pygame.Rect(610, 430, 220, 45)
-            pygame.draw.rect(tela, COR_VERMELHO, btn_cancelar, border_radius=8)
+            btn_cancelar = srect(610, 430, 220, 45)
+            pygame.draw.rect(tela, COR_VERMELHO, btn_cancelar, border_radius=sw(8))
             txt_canc = fonte_titulo.render("CANCELAR", True, COR_TEXTO)
-            tela.blit(txt_canc, (btn_cancelar.x + 60, btn_cancelar.y + 10))
+            tela.blit(txt_canc, (btn_cancelar.x + sw(60), btn_cancelar.y + sh(10)))
 
         # 5. MODAL DE FIM DE JOGO (CASO RESOLVIDO)
         if estado_jogo["jogo_encerrado"]:
@@ -549,71 +597,71 @@ while rodando:
             tela.blit(s_overlay, (0, 0))
 
             tempo_esgotado = estado_jogo["mensagem_resultado"].startswith(("TEMPO ESGOTADO", "ACABARAM AS TENTATIVAS"))
-            rect_box = pygame.Rect(320, 85, 560, 550) if tempo_esgotado else pygame.Rect(320, 150, 560, 400)
-            pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=12)
-            pygame.draw.rect(tela, COR_AMARELO, rect_box, 2, border_radius=12)
+            rect_box = srect(320, 85, 560, 550) if tempo_esgotado else srect(320, 150, 560, 400)
+            pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
+            pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
             if tempo_esgotado:
                 if img_fim_de_jogo:
-                    tela.blit(img_fim_de_jogo, (400, 110))
+                    tela.blit(img_fim_de_jogo, (sx(400), sy(110)))
                 else:
-                    tela.blit(fonte_titulo.render("FIM DE JOGO", True, COR_VERMELHO), (515, 125))
+                    tela.blit(fonte_titulo.render("FIM DE JOGO", True, COR_VERMELHO), (sx(515), sy(125)))
                 mensagem_fim = "ACABARAM AS TENTATIVAS!" if estado_jogo["mensagem_resultado"].startswith("ACABARAM AS TENTATIVAS") else "TEMPO ESGOTADO!"
-                tela.blit(fonte_titulo.render(mensagem_fim, True, COR_VERMELHO), (500, 350))
-                tela.blit(fonte_titulo.render("Deseja jogar novamente?", True, COR_TEXTO), (460, 390))
-                btn_reiniciar = pygame.Rect(360, 470, 220, 50)
-                btn_sair = pygame.Rect(600, 470, 220, 50)
-                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=8)
-                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
-                tela.blit(fonte_titulo.render("JOGAR NOVAMENTE", True, COR_TEXTO), (btn_reiniciar.x + 14, btn_reiniciar.y + 12))
-                tela.blit(fonte_titulo.render("SAIR DO JOGO", True, COR_TEXTO), (btn_sair.x + 35, btn_sair.y + 12))
+                tela.blit(fonte_titulo.render(mensagem_fim, True, COR_VERMELHO), (sx(500), sy(350)))
+                tela.blit(fonte_titulo.render("Deseja jogar novamente?", True, COR_TEXTO), (sx(460), sy(390)))
+                btn_reiniciar = srect(360, 470, 220, 50)
+                btn_sair = srect(600, 470, 220, 50)
+                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=sw(8))
+                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=sw(8))
+                tela.blit(fonte_titulo.render("JOGAR NOVAMENTE", True, COR_TEXTO), (btn_reiniciar.x + sw(14), btn_reiniciar.y + sh(12)))
+                tela.blit(fonte_titulo.render("SAIR DO JOGO", True, COR_TEXTO), (btn_sair.x + sw(35), btn_sair.y + sh(12)))
             else:
                 txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
-                tela.blit(txt_vit, (350, 200))
+                tela.blit(txt_vit, (sx(350), sy(200)))
                 img_culpado = imgs_suspeitos_modal.get(estado_jogo["culpado"])
                 if img_culpado:
-                    tela.blit(img_culpado, (555, 240))
+                    tela.blit(img_culpado, (sx(555), sy(240)))
                 txt_sol = fonte_pista.render(
                     f"Culpado: {estado_jogo['culpado']}  |  Arma: {estado_jogo['arma_real']}  |  Local: {estado_jogo['local_real']}",
                     True, COR_AMARELO
                 )
-                tela.blit(txt_sol, (350, 345))
-                tela.blit(fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO), (440, 380))
-                btn_reiniciar = pygame.Rect(360, 430, 220, 50)
-                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=8)
-                tela.blit(fonte_titulo.render("PRÓXIMA FASE", True, COR_TEXTO), (btn_reiniciar.x + 48, btn_reiniciar.y + 12))
-                tela.blit(fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO), (440, 410))
-                btn_sair = pygame.Rect(600, 430, 220, 50)
-                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
-                tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + 18, btn_sair.y + 12))
+                tela.blit(txt_sol, (sx(350), sy(345)))
+                tela.blit(fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO), (sx(440), sy(380)))
+                btn_reiniciar = srect(360, 430, 220, 50)
+                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=sw(8))
+                tela.blit(fonte_titulo.render("PRÓXIMA FASE", True, COR_TEXTO), (btn_reiniciar.x + sw(48), btn_reiniciar.y + sh(12)))
+                tela.blit(fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO), (sx(440), sy(410)))
+                btn_sair = srect(600, 430, 220, 50)
+                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=sw(8))
+                tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + sw(18), btn_sair.y + sh(12)))
 
     # TELA DE RANKING FINAL
     elif etapa_atual == "RANKING_FINAL":
         tela.fill(COR_ESQUERDA)
 
-        rect_box = pygame.Rect(320, 150, 560, 400)
-        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=12)
-        pygame.draw.rect(tela, COR_AMARELO, rect_box, 2, border_radius=12)
+        rect_box = srect(320, 150, 560, 400)
+        pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
+        pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
         txt_t = fonte_titulo.render("RANKING FINAL DO INVESTIGADOR", True, COR_AMARELO)
-        tela.blit(txt_t, (350, 180))
+        tela.blit(txt_t, (sx(350), sy(180)))
 
         txt_p = fonte_grelha.render(f"Detetive: {nome_jogador}", True, COR_TEXTO)
-        tela.blit(txt_p, (350, 230))
+        tela.blit(txt_p, (sx(350), sy(230)))
 
         txt_c = fonte_grelha.render(f"Casos Resolvidos: {casos_resolvidos}", True, COR_TEXTO)
-        tela.blit(txt_c, (350, 260))
+        tela.blit(txt_c, (sx(350), sy(260)))
 
         txt_pts = fonte_titulo.render(f"Pontuação Total: {pontuacao_total} pts", True, COR_VERDE)
-        tela.blit(txt_pts, (350, 300))
+        tela.blit(txt_pts, (sx(350), sy(300)))
 
         txt_msg = fonte_pista.render("Obrigado por jogar SHERLOGIC!", True, COR_TEXTO)
-        tela.blit(txt_msg, (350, 360))
+        tela.blit(txt_msg, (sx(350), sy(360)))
 
-        btn_fechar = pygame.Rect(350, 440, 500, 50)
-        pygame.draw.rect(tela, COR_VERMELHO, btn_fechar, border_radius=8)
+        btn_fechar = srect(350, 440, 500, 50)
+        pygame.draw.rect(tela, COR_VERMELHO, btn_fechar, border_radius=sw(8))
         txt_fc = fonte_titulo.render("FECHAR JOGO", True, COR_TEXTO)
-        tela.blit(txt_fc, (btn_fechar.x + 190, btn_fechar.y + 12))
+        tela.blit(txt_fc, (btn_fechar.x + sw(190), btn_fechar.y + sh(12)))
 
     # GERENCIAMENTO DE EVENTOS DE ENTRADA
     for evento in pygame.event.get():
@@ -621,7 +669,7 @@ while rodando:
             rodando = False
 
         elif evento.type == pygame.MOUSEWHEEL and etapa_atual == "JOGO":
-            max_scroll = max(0.0, float(altura_total_pistas - 410))
+            max_scroll = max(0.0, float(altura_total_pistas - 401))
             alvo_scroll = max(0.0, min(max_scroll, alvo_scroll - evento.y * 35))
 
         elif evento.type == pygame.KEYDOWN:
@@ -664,7 +712,7 @@ while rodando:
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 85 - 410))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -679,13 +727,13 @@ while rodando:
             pos_mouse = evento.pos
 
             if etapa_atual == "NOME":
-                btn_avancar = pygame.Rect(380, 400, 440, 45)
+                btn_avancar = srect(380, 400, 440, 45)
                 if btn_avancar.collidepoint(pos_mouse) and nome_jogador.strip():
                     etapa_atual = "PERGUNTA_TUTORIAL"
 
             elif etapa_atual == "PERGUNTA_TUTORIAL":
-                btn_sim = pygame.Rect(380, 360, 200, 50)
-                btn_nao = pygame.Rect(620, 360, 200, 50)
+                btn_sim = srect(380, 360, 200, 50)
+                btn_nao = srect(620, 360, 200, 50)
 
                 if btn_sim.collidepoint(pos_mouse):
                     etapa_atual = "TUTORIAL"
@@ -697,7 +745,7 @@ while rodando:
                     alvo_scroll = 0.0
 
             elif etapa_atual == "TUTORIAL":
-                btn_prox = pygame.Rect(750, 530, 220, 45)
+                btn_prox = srect(750, 530, 220, 45)
                 if btn_prox.collidepoint(pos_mouse):
                     if passo_tutorial < 2:
                         passo_tutorial += 1
@@ -711,8 +759,8 @@ while rodando:
                 if estado_jogo["jogo_encerrado"]:
                     tempo_esgotado = estado_jogo["mensagem_resultado"].startswith(("TEMPO ESGOTADO", "ACABARAM AS TENTATIVAS"))
                     y_botoes = 470 if tempo_esgotado else 430
-                    btn_reiniciar = pygame.Rect(360, y_botoes, 220, 50)
-                    btn_sair = pygame.Rect(600, y_botoes, 220, 50)
+                    btn_reiniciar = srect(360, y_botoes, 220, 50)
+                    btn_sair = srect(600, y_botoes, 220, 50)
 
                     if btn_reiniciar.collidepoint(pos_mouse):
                         if not tempo_esgotado:
@@ -727,14 +775,14 @@ while rodando:
                         etapa_atual = "RANKING_FINAL"
 
                 elif modal_acusacao_aberto:
-                    btn_s_esq = pygame.Rect(480, 215, 35, 30)
-                    btn_s_dir = pygame.Rect(720, 215, 35, 30)
-                    btn_a_esq = pygame.Rect(480, 275, 35, 30)
-                    btn_a_dir = pygame.Rect(720, 275, 35, 30)
-                    btn_l_esq = pygame.Rect(480, 335, 35, 30)
-                    btn_l_dir = pygame.Rect(720, 335, 35, 30)
-                    btn_confirmar = pygame.Rect(370, 430, 220, 45)
-                    btn_cancelar = pygame.Rect(610, 430, 220, 45)
+                    btn_s_esq = srect(480, 215, 35, 30)
+                    btn_s_dir = srect(720, 215, 35, 30)
+                    btn_a_esq = srect(480, 275, 35, 30)
+                    btn_a_dir = srect(720, 275, 35, 30)
+                    btn_l_esq = srect(480, 335, 35, 30)
+                    btn_l_dir = srect(720, 335, 35, 30)
+                    btn_confirmar = srect(370, 430, 220, 45)
+                    btn_cancelar = srect(610, 430, 220, 45)
 
                     if btn_s_esq.collidepoint(pos_mouse):
                         sel_suspeito = (sel_suspeito - 1) % 4
@@ -793,7 +841,7 @@ while rodando:
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 85 - 410))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -806,12 +854,12 @@ while rodando:
 
                     for lin in range(8):
                         for col in range(4):
-                            r = pygame.Rect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula, tam_celula)
+                            r = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula, tam_celula)
                             if r.collidepoint(pos_mouse):
                                 estado_jogo["grelha_unica"][lin][col] = (estado_jogo["grelha_unica"][lin][col] + 1) % 3
 
             elif etapa_atual == "RANKING_FINAL":
-                btn_fechar = pygame.Rect(350, 440, 500, 50)
+                btn_fechar = srect(350, 440, 500, 50)
                 if btn_fechar.collidepoint(pos_mouse):
                     rodando = False
 
