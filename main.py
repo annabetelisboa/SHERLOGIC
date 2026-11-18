@@ -4,6 +4,7 @@ import sys
 import os
 import time
 
+
 # FUNÇÃO PARA REINICIAR O JOGO
 def iniciar_novo_jogo():
     suspeitos = ["Mordomo", "Cozinheira", "Jardineiro", "Motorista"]
@@ -93,13 +94,16 @@ def iniciar_novo_jogo():
         "jogo_encerrado": False
     }
 
+
 def limite_pistas_fase(fase):
     """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
     return 10 if fase == 1 else max(5, 10 - (fase - 1))
 
+
 def tempo_limite_fase(fase):
     """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
     return max(30, 90 - (fase - 1) * 10)
+
 
 # INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
 pygame.init()
@@ -108,7 +112,7 @@ tela = pygame.display.set_mode((LARGURA, ALTURA), pygame.FULLSCREEN | pygame.SCA
 pygame.display.set_caption("SHERLOGIC - Painel de Investigação")
 clock = pygame.time.Clock()
 
-# CARREGAMENTO DAS IMAGENS (LOGOS E SUSPEITOS)
+
 def carregar_imagem(caminho, tamanho):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
     nome_base = os.path.splitext(caminho)[0]
@@ -122,6 +126,7 @@ def carregar_imagem(caminho, tamanho):
                 return None
     return None
 
+
 logo_img = carregar_imagem("logosherlogic.jpeg", (240, 70))
 if not logo_img:
     logo_img = carregar_imagem("sóalupalogo.jpeg", (70, 70))
@@ -132,14 +137,12 @@ imgs_suspeitos = {
     "Jardineiro": carregar_imagem("jardineiro.jpg", (45, 45)),
     "Motorista": carregar_imagem("motorista.jpg", (45, 45))
 }
-
 imgs_suspeitos_modal = {
     "Mordomo": carregar_imagem("mordomo.jpg", (90, 90)),
     "Cozinheira": carregar_imagem("cozinheira.jpg", (90, 90)),
     "Jardineiro": carregar_imagem("jardineiro.jpg", (90, 90)),
     "Motorista": carregar_imagem("motorista.jpg", (90, 90))
 }
-
 img_fim_de_jogo = carregar_imagem("fim_de_jogo.jpg", (400, 225))
 
 # Paleta de arquivo policial: papel quente, tinta escura e detalhes em latão.
@@ -185,15 +188,20 @@ nivel_atual = 1
 etapa_atual = "NOME"
 passo_tutorial = 0
 
-# Modais do Jogo
+# Modais e Animações do Jogo
 modal_acusacao_aberto = False
 sel_suspeito = 0
 sel_arma = 0
 sel_local = 0
 categoria_foco = 0
-pistas_scroll = 0
+
+pistas_scroll = 0.0
+alvo_scroll = 0.0
+animacao_nova_pista_y = 0.0
+altura_total_pistas = 0
 
 estado_jogo = iniciar_novo_jogo()
+
 
 def desenhar_texto_multilinhas(superficie, texto, x, y, largura_max, fonte, cor):
     palavras = texto.split(' ')
@@ -216,6 +224,7 @@ def desenhar_texto_multilinhas(superficie, texto, x, y, largura_max, fonte, cor)
         altura_y += fonte.get_height() + 2
     return altura_y
 
+
 def desenhar_linhas_tutorial(superficie, linhas_texto, x, y, fonte, cor):
     altura_y = y
     for linha in linhas_texto:
@@ -223,10 +232,10 @@ def desenhar_linhas_tutorial(superficie, linhas_texto, x, y, fonte, cor):
         superficie.blit(txt_surface, (x, altura_y))
         altura_y += fonte.get_height() + 12
 
+
 # Loop Principal
 rodando = True
 while rodando:
-
     # TELA DE DIGITAÇÃO DO NOME
     if etapa_atual == "NOME":
         tela.fill(COR_ESQUERDA)
@@ -336,11 +345,19 @@ while rodando:
             tempo_restante = max(0, int(estado_jogo["tempo_limite"] - (time.time() - estado_jogo["tempo_inicio"])))
             if tempo_restante == 0:
                 estado_jogo["jogo_encerrado"] = True
-                estado_jogo["mensagem_resultado"] = "TEMPO ESGOTADO! O caso foi encerrado."
+                estado_jogo["mensagem_resultado"] = "TEMPO ESGOTADO!"
                 estado_jogo["cor_resultado"] = COR_VERMELHO
+                modal_acusacao_aberto = False
         else:
             tempo_restante = 0
-        tela.fill(COR_DIREITA)
+
+        # Atualização suave da animação das pistas subindo (Ease-Out bem visível)
+        pistas_scroll += (alvo_scroll - pistas_scroll) * 0.12
+        if animacao_nova_pista_y > 0:
+            animacao_nova_pista_y -= max(2.0, animacao_nova_pista_y * 0.08)
+            if animacao_nova_pista_y < 1:
+                animacao_nova_pista_y = 0.0
+
         suspeitos = estado_jogo["suspeitos"]
         armas = estado_jogo["armas"]
         locais = estado_jogo["locais"]
@@ -372,22 +389,32 @@ while rodando:
         cor_tempo = COR_VERMELHO if tempo_restante <= 10 else COR_AMARELO
         txt_tempo = fonte_grelha.render(f"TEMPO: {tempo_restante // 60:02d}:{tempo_restante % 60:02d}", True, cor_tempo)
         tela.blit(txt_tempo, (350, 70))
+
         area_pistas = pygame.Rect(10, 105, 480, 410)
         tela.set_clip(area_pistas)
-        y_pista = area_pistas.top - pistas_scroll
+        y_base = area_pistas.top - pistas_scroll
+        altura_acumulada = 0
+
         for i, p in enumerate(estado_jogo["pistas_reveladas"]):
+            y_atual = y_base + altura_acumulada
+            if i == len(estado_jogo["pistas_reveladas"]) - 1:
+                y_atual += animacao_nova_pista_y
+
             historia = f'"{p["historia"]}"'
             altura_texto = desenhar_texto_multilinhas(
-                tela, historia, 28, y_pista + 22, 440, fonte_pista, COR_TEXTO
+                tela, historia, 28, y_atual + 22, 440, fonte_pista, COR_TEXTO
             )
-            altura_card = max(48, altura_texto - y_pista + 5)
-            pygame.draw.rect(tela, COR_CARTAO, (14, y_pista - 3, 472, altura_card), border_radius=8)
-            pygame.draw.rect(tela, COR_LINHA_DIVISORA, (14, y_pista - 3, 4, altura_card), border_radius=3)
+            altura_card = max(48, altura_texto - y_atual + 5)
+            pygame.draw.rect(tela, COR_CARTAO, (14, y_atual - 3, 472, altura_card), border_radius=8)
+            pygame.draw.rect(tela, COR_LINHA_DIVISORA, (14, y_atual - 3, 4, altura_card), border_radius=3)
             txt_f = fonte_grelha.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
-            tela.blit(txt_f, (26, y_pista))
-            desenhar_texto_multilinhas(tela, historia, 28, y_pista + 22, 440, fonte_pista, COR_TEXTO)
-            y_pista += altura_card + 10
+            tela.blit(txt_f, (26, y_atual))
+            desenhar_texto_multilinhas(tela, historia, 28, y_atual + 22, 440, fonte_pista, COR_TEXTO)
+            altura_acumulada += altura_card + 10
+
+        altura_total_pistas = altura_acumulada
         tela.set_clip(None)
+
         if estado_jogo["mensagem_resultado"]:
             txt_res = fonte_grelha.render(estado_jogo["mensagem_resultado"], True, estado_jogo["cor_resultado"])
             tela.blit(txt_res, (20, 530))
@@ -450,7 +477,7 @@ while rodando:
 
         pygame.draw.line(tela, COR_DIVISOR_TABELA, (ox - 140, oy + 4 * tam_celula - 1), (ox + 4 * tam_celula, oy + 4 * tam_celula - 1), 3)
 
-        # 4. MODAL DE ACUSAÇÃO INTERATIVO
+        # 4. MODAL DE ACUSAÇÃO
         if modal_acusacao_aberto and not estado_jogo["jogo_encerrado"]:
             s_overlay = pygame.Surface((LARGURA, ALTURA))
             s_overlay.set_alpha(200)
@@ -560,7 +587,7 @@ while rodando:
                 pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
                 tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + 18, btn_sair.y + 12))
 
-    # TELA DE RANKING FINAL (SAIR DO JOGO)
+    # TELA DE RANKING FINAL
     elif etapa_atual == "RANKING_FINAL":
         tela.fill(COR_ESQUERDA)
 
@@ -594,8 +621,8 @@ while rodando:
             rodando = False
 
         elif evento.type == pygame.MOUSEWHEEL and etapa_atual == "JOGO":
-            max_scroll = max(0, len(estado_jogo["pistas_reveladas"]) * 100 - 410)
-            pistas_scroll = max(0, min(max_scroll, pistas_scroll - evento.y * 35))
+            max_scroll = max(0.0, float(altura_total_pistas - 410))
+            alvo_scroll = max(0.0, min(max_scroll, alvo_scroll - evento.y * 35))
 
         elif evento.type == pygame.KEYDOWN:
             if etapa_atual == "NOME":
@@ -636,6 +663,8 @@ while rodando:
                         if estado_jogo["pista_index"] < min(len(estado_jogo["pistas"]), limite_pistas_fase(nivel_atual)):
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
+                            animacao_nova_pista_y = 380.0
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 85 - 410))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -664,7 +693,8 @@ while rodando:
                 elif btn_nao.collidepoint(pos_mouse):
                     etapa_atual = "JOGO"
                     estado_jogo = iniciar_novo_jogo()
-                    pistas_scroll = 0
+                    pistas_scroll = 0.0
+                    alvo_scroll = 0.0
 
             elif etapa_atual == "TUTORIAL":
                 btn_prox = pygame.Rect(750, 530, 220, 45)
@@ -674,7 +704,8 @@ while rodando:
                     else:
                         etapa_atual = "JOGO"
                         estado_jogo = iniciar_novo_jogo()
-                        pistas_scroll = 0
+                        pistas_scroll = 0.0
+                        alvo_scroll = 0.0
 
             elif etapa_atual == "JOGO":
                 if estado_jogo["jogo_encerrado"]:
@@ -689,12 +720,19 @@ while rodando:
                         else:
                             nivel_atual = 1
                         estado_jogo = iniciar_novo_jogo()
-                        pistas_scroll = 0
+                        pistas_scroll = 0.0
+                        alvo_scroll = 0.0
                         modal_acusacao_aberto = False
                     elif btn_sair.collidepoint(pos_mouse):
                         etapa_atual = "RANKING_FINAL"
 
                 elif modal_acusacao_aberto:
+                    btn_s_esq = pygame.Rect(480, 215, 35, 30)
+                    btn_s_dir = pygame.Rect(720, 215, 35, 30)
+                    btn_a_esq = pygame.Rect(480, 275, 35, 30)
+                    btn_a_dir = pygame.Rect(720, 275, 35, 30)
+                    btn_l_esq = pygame.Rect(480, 335, 35, 30)
+                    btn_l_dir = pygame.Rect(720, 335, 35, 30)
                     btn_confirmar = pygame.Rect(370, 430, 220, 45)
                     btn_cancelar = pygame.Rect(610, 430, 220, 45)
 
@@ -754,6 +792,8 @@ while rodando:
                         if estado_jogo["pista_index"] < min(len(estado_jogo["pistas"]), limite_pistas_fase(nivel_atual)):
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
+                            animacao_nova_pista_y = 380.0
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 85 - 410))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
