@@ -109,20 +109,20 @@ imgs_suspeitos = {
     "Motorista": carregar_imagem("motorista.jpg", (50, 50))
 }
 
-# PALETA DE CORES TEMA BORDÔ
-COR_ESQUERDA = (38, 18, 24)         # Fundo esquerdo em bordô bem escuro
-COR_DIREITA = (20, 10, 14)          # Fundo direito quase preto, com um toque quente
-COR_BORDAS = (212, 163, 115)        # Dourado/Cobre elegante para contrastar
-COR_TEXTO = (235, 225, 215)         # Creme/Marfim claro
-COR_FOCO = (220, 180, 110)          # Dourado de destaque
-COR_VERMELHO_FORTE = (210, 50, 60)  
-COR_VERDE = (60, 150, 90)           
-COR_CELULA = (50, 24, 32)           # Células da tabela em bordô
-COR_BOTAO_PADRAO = (75, 32, 45)     # Botão pedir pista
-COR_BOTAO_ACUSAR = (140, 35, 45)    # Botão de acusar mais intenso
-COR_BOTAO_SAIR = (45, 20, 26)       # Botão de sair discreto
-COR_CARD = (48, 22, 30)             # Fundo dos cartões de pista
-COR_BORDA_CELULA = (90, 45, 55)     # Contorno das células da grelha
+# PALETA DE CORES TEMA NOIR (ORIGINAL) COM BOTÕES AJUSTADOS
+COR_ESQUERDA = (22, 26, 30)         
+COR_DIREITA = (15, 18, 22)          
+COR_BORDAS = (150, 160, 170)        
+COR_TEXTO = (220, 225, 230)         
+COR_FOCO = (200, 170, 100)          
+COR_VERMELHO_FORTE = (220, 60, 60)  
+COR_VERDE = (80, 180, 100)           
+COR_CELULA = (35, 40, 45)           
+COR_BOTAO_PADRAO = (60, 75, 90)     # Azul acinzentado um pouco mais claro para destacar do fundo
+COR_BOTAO_ACUSAR = (175, 45, 50)    # Vermelho mais vivo e brilhante para chamar a atenção
+COR_BOTAO_SAIR = (40, 45, 50)       # Cinza sutil, ligeiramente mais claro que o fundo
+COR_CARD = (28, 33, 38)             
+COR_BORDA_CELULA = (60, 68, 75)     
 
 # Fontes
 fonte_titulo = pygame.font.SysFont("georgia", 20, bold=True)
@@ -145,9 +145,9 @@ casos_resolvidos = 0
 nivel_atual = 1
 
 # VARIÁVEIS DE ANIMAÇÃO 
-pistas_scroll = 0.0          # Scroll atual
-alvo_scroll = 0.0            # Scroll destino (para onde a tela vai rolar suavemente)
-animacao_nova_pista_y = 0.0  # Deslocamento Y da última pista para o efeito "subindo"
+pistas_scroll = 0.0          
+alvo_scroll = 0.0            
+animacao_nova_pista_y = 0.0  
 
 def desenhar_texto_multilinhas(superficie, texto, x, y, largura_max, fonte, cor):
     palavras = texto.split(' ')
@@ -182,13 +182,9 @@ while rodando:
     else:
         tempo_restante = 0
 
-    # ==================================================
     # LÓGICA DE ATUALIZAÇÃO DA ANIMAÇÃO (EASE-OUT)
-    # ==================================================
-    # Interpolação do scroll para descer suavemente
     pistas_scroll += (alvo_scroll - pistas_scroll) * 0.15 
     
-    # Faz a pista subir suavemente até a posição 0 (reduzindo a distância)
     if animacao_nova_pista_y > 0:
         animacao_nova_pista_y -= max(1.0, animacao_nova_pista_y * 0.15)
         if animacao_nova_pista_y < 1:
@@ -227,7 +223,7 @@ while rodando:
     tela.blit(txt_tempo, (380, 75))
 
     # ==================================================
-    # Renderização dos Cards das Pistas (Com Máscara de Corte)
+    # Renderização dos Cards das Pistas
     # ==================================================
     area_pistas = pygame.Rect(10, 115, 480, 430)
     tela.set_clip(area_pistas)
@@ -236,12 +232,10 @@ while rodando:
     for i, p in enumerate(estado_jogo["pistas_reveladas"]):
         y_atual = y_pista
         
-        # Se for o último card inserido, aplica o deslocamento para ele "subir"
         if i == len(estado_jogo["pistas_reveladas"]) - 1:
             y_atual += animacao_nova_pista_y
 
         card_rect = pygame.Rect(14, y_atual, 452, 68)
-        # Usando a nova cor para o card e para a borda
         pygame.draw.rect(tela, COR_CARD, card_rect, border_radius=6)
         pygame.draw.rect(tela, COR_BORDAS, card_rect, 1, border_radius=6)
         pygame.draw.rect(tela, COR_FOCO, (14, y_atual, 4, 68), border_radius=2) 
@@ -306,7 +300,6 @@ while rodando:
         for col in range(4):
             rect = pygame.Rect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 2, tam_celula - 2)
             
-            # Usando a nova cor para as células da tabela
             pygame.draw.rect(tela, COR_CELULA, rect, border_radius=6)
             pygame.draw.rect(tela, COR_BORDA_CELULA, rect, 1, border_radius=6)
 
@@ -333,13 +326,11 @@ while rodando:
             if evento.key == pygame.K_ESCAPE:
                 rodando = False
             elif evento.key == pygame.K_1:
-                # Dispara a lógica de revelação e a animação
                 if estado_jogo["pista_index"] < len(estado_jogo["pistas"]):
                     estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                     estado_jogo["pista_index"] += 1
-                    
-                    animacao_nova_pista_y = 120 # O quão abaixo ela começa antes de subir
-                    alvo_scroll = max(0, len(estado_jogo["pistas_reveladas"]) * 76 - 430) # Força o scroll para a pista nova
+                    animacao_nova_pista_y = 120 
+                    alvo_scroll = max(0, len(estado_jogo["pistas_reveladas"]) * 76 - 430) 
                     
             elif evento.key == pygame.K_2:
                 print("Lógica de Acusação")
@@ -348,11 +339,9 @@ while rodando:
             pos_mouse = evento.pos
             
             if btn_pedir_pista.collidepoint(pos_mouse):
-                # Dispara a lógica de revelação e a animação pelo botão do mouse
                 if estado_jogo["pista_index"] < len(estado_jogo["pistas"]):
                     estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                     estado_jogo["pista_index"] += 1
-                    
                     animacao_nova_pista_y = 120 
                     alvo_scroll = max(0, len(estado_jogo["pistas_reveladas"]) * 76 - 430) 
                     
