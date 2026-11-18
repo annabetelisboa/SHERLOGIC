@@ -220,6 +220,7 @@ COR_CARTAO = (22, 29, 33)
 
 # Fontes renderizadas diretamente na resolução nativa do monitor (nitidez 100%)
 fonte_titulo = pygame.font.SysFont("segoeui,arial", max(14, int(21 * ESCALA)), bold=True)
+fonte_botao = pygame.font.SysFont("georgia,bookantiqua,timesnewroman,serif", max(14, int(20 * ESCALA)), bold=True)
 fonte_pista = pygame.font.SysFont("segoeui,calibri,arial", max(12, int(16 * ESCALA)))
 fonte_formula = pygame.font.SysFont("consolas,segoeui,arial", max(11, int(15 * ESCALA)), bold=True)
 fonte_grelha = pygame.font.SysFont("segoeui,arial", max(12, int(15 * ESCALA)), bold=True)
@@ -259,6 +260,14 @@ animacao_nova_pista_y = 0.0
 altura_total_pistas = 0
 
 estado_jogo = iniciar_novo_jogo()
+
+
+def desenhar_botao(superficie, rect, cor_fundo, texto, fonte=fonte_botao, cor_texto=COR_TEXTO, raio=8):
+    pygame.draw.rect(superficie, cor_fundo, rect, border_radius=sw(raio))
+    txt_surf = fonte.render(texto, True, cor_texto)
+    pos_x = rect.x + (rect.width - txt_surf.get_width()) // 2
+    pos_y = rect.y + (rect.height - txt_surf.get_height()) // 2
+    superficie.blit(txt_surf, (pos_x, pos_y))
 
 
 def desenhar_texto_multilinhas(superficie, texto, x_logico, y_logico, largura_max_logica, fonte, cor, desenhar=True):
@@ -320,9 +329,7 @@ while rodando:
         tela.blit(txt_nome, (rect_input.x + sw(15), rect_input.y + sh(10)))
 
         btn_avancar = srect(380, 400, 440, 45)
-        pygame.draw.rect(tela, COR_VERDE, btn_avancar, border_radius=sw(8))
-        txt_av = fonte_titulo.render("CONTINUAR", True, COR_TEXTO)
-        tela.blit(txt_av, (btn_avancar.x + sw(160), btn_avancar.y + sh(10)))
+        desenhar_botao(tela, btn_avancar, COR_VERDE, "CONTINUAR", raio=8)
 
     # TELA DE PERGUNTA DO TUTORIAL
     elif etapa_atual == "PERGUNTA_TUTORIAL":
@@ -339,14 +346,10 @@ while rodando:
         tela.blit(txt_q, (sx(380), sy(290)))
 
         btn_sim = srect(380, 360, 200, 50)
-        pygame.draw.rect(tela, COR_VERDE, btn_sim, border_radius=sw(8))
-        txt_s = fonte_titulo.render("SIM", True, COR_TEXTO)
-        tela.blit(txt_s, (btn_sim.x + sw(85), btn_sim.y + sh(12)))
+        desenhar_botao(tela, btn_sim, COR_VERDE, "SIM", raio=8)
 
         btn_nao = srect(620, 360, 200, 50)
-        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_nao, border_radius=sw(8))
-        txt_n = fonte_titulo.render("NÃO", True, COR_TEXTO)
-        tela.blit(txt_n, (btn_nao.x + sw(80), btn_nao.y + sh(12)))
+        desenhar_botao(tela, btn_nao, COR_BOTAO_PISTA, "NÃO", raio=8)
 
     # TELA DE TUTORIAL
     elif etapa_atual == "TUTORIAL":
@@ -396,10 +399,8 @@ while rodando:
             desenhar_linhas_tutorial(tela, linhas_parte_3, 230, 180, fonte_tutorial, COR_TEXTO)
 
         btn_prox = srect(750, 530, 220, 45)
-        pygame.draw.rect(tela, COR_VERDE, btn_prox, border_radius=sw(8))
         lbl_btn = "AVANÇAR" if passo_tutorial < 2 else "INICIAR JOGO"
-        txt_px = fonte_titulo.render(lbl_btn, True, COR_TEXTO)
-        tela.blit(txt_px, (btn_prox.x + sw(35), btn_prox.y + sh(10)))
+        desenhar_botao(tela, btn_prox, COR_VERDE, lbl_btn, raio=8)
 
     # TELA PRINCIPAL DO JOGO
     elif etapa_atual == "JOGO":
@@ -481,18 +482,10 @@ while rodando:
             txt_res = fonte_grelha.render(estado_jogo["mensagem_resultado"], True, estado_jogo["cor_resultado"])
             tela.blit(txt_res, (sx(20), sy(530)))
 
-        # Botões Esquerda
-        pygame.draw.rect(tela, COR_BOTAO_PISTA, btn_pedir_pista, border_radius=sw(8))
-        txt_btn1 = fonte_titulo.render("PEDIR NOVA PISTA [1]", True, COR_TEXTO)
-        tela.blit(txt_btn1, (btn_pedir_pista.x + sw(115), btn_pedir_pista.y + sh(8)))
-
-        pygame.draw.rect(tela, COR_BOTAO_ACUSAR, btn_acusar, border_radius=sw(8))
-        txt_btn2 = fonte_titulo.render("FAZER ACUSAÇÃO [2]", True, COR_TEXTO)
-        tela.blit(txt_btn2, (btn_acusar.x + sw(125), btn_acusar.y + sh(8)))
-
-        pygame.draw.rect(tela, COR_BOTAO_SAIR, btn_sair_jogo, border_radius=sw(8))
-        txt_btn3 = fonte_titulo.render("SAIR DO JOGO [ESC]", True, COR_TEXTO)
-        tela.blit(txt_btn3, (btn_sair_jogo.x + sw(130), btn_sair_jogo.y + sh(6)))
+        # Botões Esquerda com a mesma tipografia serifada clássica da logo
+        desenhar_botao(tela, btn_pedir_pista, COR_BOTAO_PISTA, "PEDIR NOVA PISTA [1]", raio=8)
+        desenhar_botao(tela, btn_acusar, COR_BOTAO_ACUSAR, "FAZER ACUSAÇÃO [2]", raio=8)
+        desenhar_botao(tela, btn_sair_jogo, COR_BOTAO_SAIR, "SAIR DO JOGO [ESC]", raio=8)
 
         # 2. METADE DIREITA (GRELHA DE DEDUÇÃO AMPLIADA)
         pygame.draw.rect(tela, COR_DIREITA, (sx(500), 0, LARGURA - sx(500), ALTURA))
@@ -584,20 +577,12 @@ while rodando:
             btn_l_esq = srect(480, 335, 35, 30)
             btn_l_dir = srect(720, 335, 35, 30)
 
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_esq, border_radius=sw(5))
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_s_dir, border_radius=sw(5))
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_s_esq.x + sw(11), btn_s_esq.y + sh(3)))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_s_dir.x + sw(11), btn_s_dir.y + sh(3)))
-
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_esq, border_radius=sw(5))
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_a_dir, border_radius=sw(5))
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_a_esq.x + sw(11), btn_a_esq.y + sh(3)))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_a_dir.x + sw(11), btn_a_dir.y + sh(3)))
-
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_esq, border_radius=sw(5))
-            pygame.draw.rect(tela, COR_BOTAO_SETA, btn_l_dir, border_radius=sw(5))
-            tela.blit(fonte_titulo.render("<", True, COR_TEXTO), (btn_l_esq.x + sw(11), btn_l_esq.y + sh(3)))
-            tela.blit(fonte_titulo.render(">", True, COR_TEXTO), (btn_l_dir.x + sw(11), btn_l_dir.y + sh(3)))
+            desenhar_botao(tela, btn_s_esq, COR_BOTAO_SETA, "<", raio=5)
+            desenhar_botao(tela, btn_s_dir, COR_BOTAO_SETA, ">", raio=5)
+            desenhar_botao(tela, btn_a_esq, COR_BOTAO_SETA, "<", raio=5)
+            desenhar_botao(tela, btn_a_dir, COR_BOTAO_SETA, ">", raio=5)
+            desenhar_botao(tela, btn_l_esq, COR_BOTAO_SETA, "<", raio=5)
+            desenhar_botao(tela, btn_l_dir, COR_BOTAO_SETA, ">", raio=5)
 
             txt_s_label = fonte_grelha.render("1. Suspeito:", True, COR_TEXTO)
             tela.blit(txt_s_label, (sx(370), sy(220)))
@@ -618,14 +603,10 @@ while rodando:
             tela.blit(txt_inst, (sx(370), sy(385)))
 
             btn_confirmar = srect(370, 430, 220, 45)
-            pygame.draw.rect(tela, COR_VERDE, btn_confirmar, border_radius=sw(8))
-            txt_conf = fonte_titulo.render("CONFIRMAR", True, COR_TEXTO)
-            tela.blit(txt_conf, (btn_confirmar.x + sw(50), btn_confirmar.y + sh(10)))
+            desenhar_botao(tela, btn_confirmar, COR_VERDE, "CONFIRMAR", raio=8)
 
             btn_cancelar = srect(610, 430, 220, 45)
-            pygame.draw.rect(tela, COR_VERMELHO, btn_cancelar, border_radius=sw(8))
-            txt_canc = fonte_titulo.render("CANCELAR", True, COR_TEXTO)
-            tela.blit(txt_canc, (btn_cancelar.x + sw(60), btn_cancelar.y + sh(10)))
+            desenhar_botao(tela, btn_cancelar, COR_VERMELHO, "CANCELAR", raio=8)
 
         # 5. MODAL DE FIM DE JOGO (CASO RESOLVIDO)
         if estado_jogo["jogo_encerrado"]:
@@ -649,10 +630,8 @@ while rodando:
                 tela.blit(fonte_titulo.render("Deseja jogar novamente?", True, COR_TEXTO), (sx(460), sy(390)))
                 btn_reiniciar = srect(360, 470, 220, 50)
                 btn_sair = srect(600, 470, 220, 50)
-                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=sw(8))
-                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=sw(8))
-                tela.blit(fonte_titulo.render("JOGAR NOVAMENTE", True, COR_TEXTO), (btn_reiniciar.x + sw(14), btn_reiniciar.y + sh(12)))
-                tela.blit(fonte_titulo.render("SAIR DO JOGO", True, COR_TEXTO), (btn_sair.x + sw(35), btn_sair.y + sh(12)))
+                desenhar_botao(tela, btn_reiniciar, COR_VERDE, "JOGAR NOVAMENTE", raio=8)
+                desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR DO JOGO", raio=8)
             else:
                 txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
                 tela.blit(txt_vit, (sx(350), sy(200)))
@@ -666,12 +645,10 @@ while rodando:
                 tela.blit(txt_sol, (sx(350), sy(345)))
                 tela.blit(fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO), (sx(440), sy(380)))
                 btn_reiniciar = srect(360, 430, 220, 50)
-                pygame.draw.rect(tela, COR_VERDE, btn_reiniciar, border_radius=sw(8))
-                tela.blit(fonte_titulo.render("PRÓXIMA FASE", True, COR_TEXTO), (btn_reiniciar.x + sw(48), btn_reiniciar.y + sh(12)))
+                desenhar_botao(tela, btn_reiniciar, COR_VERDE, "PRÓXIMA FASE", raio=8)
                 tela.blit(fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO), (sx(440), sy(410)))
                 btn_sair = srect(600, 430, 220, 50)
-                pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=sw(8))
-                tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + sw(18), btn_sair.y + sh(12)))
+                desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR", raio=8)
 
     # TELA DE RANKING FINAL
     elif etapa_atual == "RANKING_FINAL":
@@ -697,9 +674,7 @@ while rodando:
         tela.blit(txt_msg, (sx(350), sy(360)))
 
         btn_fechar = srect(350, 440, 500, 50)
-        pygame.draw.rect(tela, COR_VERMELHO, btn_fechar, border_radius=sw(8))
-        txt_fc = fonte_titulo.render("FECHAR JOGO", True, COR_TEXTO)
-        tela.blit(txt_fc, (btn_fechar.x + sw(190), btn_fechar.y + sh(12)))
+        desenhar_botao(tela, btn_fechar, COR_VERMELHO, "FECHAR JOGO", raio=8)
 
     # GERENCIAMENTO DE EVENTOS DE ENTRADA
     for evento in pygame.event.get():
