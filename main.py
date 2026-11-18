@@ -89,7 +89,7 @@ def iniciar_novo_jogo():
         "mensagem_resultado": "",
         "cor_resultado": (240, 240, 240),
         "tempo_inicio": time.time(),
-        "tempo_limite": max(10, 60 - (nivel_atual - 1) * 10),
+        "tempo_limite": tempo_limite_fase(nivel_atual),
         "jogo_encerrado": False
     }
 
@@ -98,7 +98,8 @@ def limite_pistas_fase(fase):
     return 10 if fase == 1 else max(5, 10 - (fase - 1))
 
 def tempo_limite_fase(fase):
-    return max(10, 60 - (fase - 1) * 10)
+    """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
+    return max(30, 90 - (fase - 1) * 10)
 
 # INICIALIZAÇÃO DO PYGAME E RECURSOS VISUAIS
 pygame.init()
@@ -413,7 +414,7 @@ while rodando:
         txt_tit2 = fonte_titulo.render("QUADRO DE DEDUÇÕES", True, COR_AMARELO)
         tela.blit(txt_tit2, (520, 15))
         pygame.draw.line(tela, COR_LINHA_DIVISORA, (520, 49), (710, 49), 2)
-        txt_fase = fonte_pista.render(f"FASE {nivel_atual}  ·  DIFICULDADE {min(nivel_atual, 5)}/5", True, COR_TEXTO)
+        txt_fase = fonte_pista.render(f"FASE {nivel_atual}  ·  DIFICULDADE {min(nivel_atual, 7)}/7", True, COR_TEXTO)
         tela.blit(txt_fase, (520, 57))
 
         if logo_img:
@@ -558,6 +559,7 @@ while rodando:
                 btn_sair = pygame.Rect(600, 430, 220, 50)
                 pygame.draw.rect(tela, COR_VERMELHO, btn_sair, border_radius=8)
                 tela.blit(fonte_titulo.render("SAIR", True, COR_TEXTO), (btn_sair.x + 18, btn_sair.y + 12))
+
     # TELA DE RANKING FINAL (SAIR DO JOGO)
     elif etapa_atual == "RANKING_FINAL":
         tela.fill(COR_ESQUERDA)
