@@ -151,7 +151,18 @@ pygame.display.set_caption("SHERLOGIC - Painel de Investigação")
 clock = pygame.time.Clock()
 
 
-def carregar_imagem(caminho, tamanho):
+def arredondar_imagem(superficie, raio):
+    """Aplica máscara com cantos arredondados a uma superfície Pygame."""
+    larg, alt = superficie.get_size()
+    mascara = pygame.Surface((larg, alt), pygame.SRCALPHA)
+    mascara.fill((0, 0, 0, 0))
+    pygame.draw.rect(mascara, (255, 255, 255, 255), (0, 0, larg, alt), border_radius=raio)
+    resultado = superficie.copy().convert_alpha()
+    resultado.blit(mascara, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    return resultado
+
+
+def carregar_imagem(caminho, tamanho, raio_borda=0):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
     nome_base = os.path.splitext(caminho)[0]
     tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
@@ -160,29 +171,34 @@ def carregar_imagem(caminho, tamanho):
         if os.path.exists(caminho_completo):
             try:
                 img = pygame.image.load(caminho_completo).convert_alpha()
-                return pygame.transform.smoothscale(img, tamanho_escalado)
+                img = pygame.transform.smoothscale(img, tamanho_escalado)
+                if raio_borda > 0:
+                    img = arredondar_imagem(img, max(2, sw(raio_borda)))
+                return img
             except pygame.error:
                 return None
     return None
 
 
-logo_img = carregar_imagem("logosherlogic.jpeg", (240, 70))
+# Logo menos achatada (230x96) e com cantos arredondados
+logo_img = carregar_imagem("logosherlogic.jpeg", (230, 96), raio_borda=14)
 if not logo_img:
-    logo_img = carregar_imagem("sóalupalogo.jpeg", (70, 70))
+    logo_img = carregar_imagem("sóalupalogo.jpeg", (80, 80), raio_borda=14)
 
+# Fotos maiores dos personagens acima das colunas ampliadas
 imgs_suspeitos = {
-    "Mordomo": carregar_imagem("mordomo.jpg", (45, 45)),
-    "Cozinheira": carregar_imagem("cozinheira.jpg", (45, 45)),
-    "Jardineiro": carregar_imagem("jardineiro.jpg", (45, 45)),
-    "Motorista": carregar_imagem("motorista.jpg", (45, 45))
+    "Mordomo": carregar_imagem("mordomo.jpg", (58, 58), raio_borda=6),
+    "Cozinheira": carregar_imagem("cozinheira.jpg", (58, 58), raio_borda=6),
+    "Jardineiro": carregar_imagem("jardineiro.jpg", (58, 58), raio_borda=6),
+    "Motorista": carregar_imagem("motorista.jpg", (58, 58), raio_borda=6)
 }
 imgs_suspeitos_modal = {
-    "Mordomo": carregar_imagem("mordomo.jpg", (90, 90)),
-    "Cozinheira": carregar_imagem("cozinheira.jpg", (90, 90)),
-    "Jardineiro": carregar_imagem("jardineiro.jpg", (90, 90)),
-    "Motorista": carregar_imagem("motorista.jpg", (90, 90))
+    "Mordomo": carregar_imagem("mordomo.jpg", (90, 90), raio_borda=8),
+    "Cozinheira": carregar_imagem("cozinheira.jpg", (90, 90), raio_borda=8),
+    "Jardineiro": carregar_imagem("jardineiro.jpg", (90, 90), raio_borda=8),
+    "Motorista": carregar_imagem("motorista.jpg", (90, 90), raio_borda=8)
 }
-img_fim_de_jogo = carregar_imagem("fim_de_jogo.jpg", (400, 225))
+img_fim_de_jogo = carregar_imagem("fim_de_jogo.jpg", (400, 225), raio_borda=10)
 
 # Paleta de arquivo policial com alto contraste para leitura nítida
 COR_ESQUERDA = (32, 40, 45)
@@ -206,17 +222,19 @@ COR_CARTAO = (22, 29, 33)
 fonte_titulo = pygame.font.SysFont("segoeui,arial", max(14, int(21 * ESCALA)), bold=True)
 fonte_pista = pygame.font.SysFont("segoeui,calibri,arial", max(12, int(16 * ESCALA)))
 fonte_formula = pygame.font.SysFont("consolas,segoeui,arial", max(11, int(15 * ESCALA)), bold=True)
-fonte_grelha = pygame.font.SysFont("segoeui,arial", max(11, int(14 * ESCALA)), bold=True)
+fonte_grelha = pygame.font.SysFont("segoeui,arial", max(12, int(15 * ESCALA)), bold=True)
 fonte_tutorial = pygame.font.SysFont("segoeui,arial", max(12, int(16 * ESCALA)))
+fonte_celula = pygame.font.SysFont("segoeui,arial", max(16, int(25 * ESCALA)), bold=True)
 
 # Botões Painel Esquerdo (coordenadas lógicas 1200x720)
 btn_pedir_pista = srect(20, 560, 460, 38)
 btn_acusar = srect(20, 605, 460, 38)
 btn_sair_jogo = srect(20, 650, 460, 35)
 
-tam_celula = 50
-ox = 740
-oy = 140
+# Tabela ampliada e melhor distribuída no painel direito
+tam_celula = 62
+ox = 735
+oy = 195
 
 # Dados Globais do Jogador
 nome_jogador = ""
@@ -476,7 +494,7 @@ while rodando:
         txt_btn3 = fonte_titulo.render("SAIR DO JOGO [ESC]", True, COR_TEXTO)
         tela.blit(txt_btn3, (btn_sair_jogo.x + sw(130), btn_sair_jogo.y + sh(6)))
 
-        # 2. METADE DIREITA (GRELHA DE DEDUÇÃO)
+        # 2. METADE DIREITA (GRELHA DE DEDUÇÃO AMPLIADA)
         pygame.draw.rect(tela, COR_DIREITA, (sx(500), 0, LARGURA - sx(500), ALTURA))
         pygame.draw.line(tela, COR_LINHA_DIVISORA, (sx(500), 0), (sx(500), ALTURA), max(2, sw(4)))
 
@@ -487,41 +505,61 @@ while rodando:
         tela.blit(txt_fase, (sx(520), sy(57)))
 
         if logo_img:
-            tela.blit(logo_img, (LARGURA - logo_img.get_width() - sw(20), sy(10)))
+            pos_logo_x = LARGURA - logo_img.get_width() - sw(20)
+            pos_logo_y = sy(12)
+            tela.blit(logo_img, (pos_logo_x, pos_logo_y))
+            pygame.draw.rect(
+                tela,
+                COR_AMARELO,
+                (pos_logo_x - 1, pos_logo_y - 1, logo_img.get_width() + 2, logo_img.get_height() + 2),
+                max(1, sw(2)),
+                border_radius=max(2, sw(14))
+            )
 
-        # Rótulos e fotos dos Suspeitos (Topo)
+        # Rótulos e fotos ampliadas dos Suspeitos (Topo)
         for col in range(4):
             nome_s = suspeitos[col]
             img_s = imgs_suspeitos.get(nome_s)
             if img_s:
-                tela.blit(img_s, (sx(ox + col * tam_celula + 2), sy(oy - 75)))
+                pos_foto_x = sx(ox + col * tam_celula + (tam_celula - 58) // 2)
+                pos_foto_y = sy(oy - 85)
+                tela.blit(img_s, (pos_foto_x, pos_foto_y))
+                pygame.draw.rect(
+                    tela,
+                    COR_AMARELO,
+                    (pos_foto_x - 1, pos_foto_y - 1, img_s.get_width() + 2, img_s.get_height() + 2),
+                    1,
+                    border_radius=sw(6)
+                )
             txt_col = fonte_grelha.render(nome_s[:4], True, COR_AMARELO)
-            tela.blit(txt_col, (sx(ox + col * tam_celula + 10), sy(oy - 25)))
+            pos_texto_x = sx(ox + col * tam_celula) + (sw(tam_celula) - txt_col.get_width()) // 2
+            tela.blit(txt_col, (pos_texto_x, sy(oy - 23)))
 
-        # Desenho da Tabela
+        # Desenho da Tabela Ampliada
         for lin in range(8):
             cor_rotulo = COR_AMARELO if lin < 4 else COR_TEXTO
             txt_lin = fonte_grelha.render(itens_laterais[lin][:10], True, cor_rotulo)
-            tela.blit(txt_lin, (sx(ox - 140), sy(oy + lin * tam_celula + 16)))
+            pos_rotulo_y = sy(oy + lin * tam_celula) + (sh(tam_celula) - txt_lin.get_height()) // 2
+            tela.blit(txt_lin, (sx(ox - 135), pos_rotulo_y))
 
             for col in range(4):
-                rect = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 2, tam_celula - 2)
-                pygame.draw.rect(tela, COR_CELULA, rect, border_radius=sw(7))
-                pygame.draw.rect(tela, (61, 76, 78), rect, 1, border_radius=sw(7))
+                rect = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 3, tam_celula - 3)
+                pygame.draw.rect(tela, COR_CELULA, rect, border_radius=sw(8))
+                pygame.draw.rect(tela, (61, 76, 78), rect, 1, border_radius=sw(8))
 
                 val = estado_jogo["grelha_unica"][lin][col]
                 if val == 1:
-                    txt_x = fonte_titulo.render("X", True, COR_VERMELHO)
-                    tela.blit(txt_x, (rect.x + sw(17), rect.y + sh(12)))
+                    txt_x = fonte_celula.render("X", True, COR_VERMELHO)
+                    tela.blit(txt_x, (rect.x + (rect.width - txt_x.get_width()) // 2, rect.y + (rect.height - txt_x.get_height()) // 2))
                 elif val == 2:
-                    txt_v = fonte_titulo.render("V", True, COR_VERDE)
-                    tela.blit(txt_v, (rect.x + sw(17), rect.y + sh(12)))
+                    txt_v = fonte_celula.render("V", True, COR_VERDE)
+                    tela.blit(txt_v, (rect.x + (rect.width - txt_v.get_width()) // 2, rect.y + (rect.height - txt_v.get_height()) // 2))
 
         pygame.draw.line(
             tela,
             COR_DIVISOR_TABELA,
-            (sx(ox - 140), sy(oy + 4 * tam_celula - 1)),
-            (sx(ox + 4 * tam_celula), sy(oy + 4 * tam_celula - 1)),
+            (sx(ox - 135), sy(oy + 4 * tam_celula - 2)),
+            (sx(ox + 4 * tam_celula), sy(oy + 4 * tam_celula - 2)),
             max(2, sw(3))
         )
 
