@@ -162,11 +162,14 @@ def arredondar_imagem(superficie, raio):
     return resultado
 
 
-def carregar_imagem(caminho, tamanho, raio_borda=0):
+def carregar_imagem(caminho, tamanho, raio_borda=0, usar_escala=True):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
     nome_base = os.path.splitext(caminho)[0]
-    tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
-    for extensao in (".jpeg", ".jpg", ".png", ".JPEG", ".JPG", ".PNG"):
+    if usar_escala:
+        tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
+    else:
+        tamanho_escalado = (max(1, int(tamanho[0])), max(1, int(tamanho[1])))
+    for extensao in (".png", ".jpeg", ".jpg", ".PNG", ".JPEG", ".JPG"):
         caminho_completo = os.path.join(diretorio_base, nome_base + extensao)
         if os.path.exists(caminho_completo):
             try:
@@ -180,7 +183,20 @@ def carregar_imagem(caminho, tamanho, raio_borda=0):
     return None
 
 
-# Logo menos achatada (230x96) e com cantos arredondados
+# Ícone do relógio de bolso transparente ao lado do tempo
+img_relogio = carregar_imagem("relogio_transparente.png", (30, 30))
+if not img_relogio:
+    img_relogio = carregar_imagem("relogio.png", (30, 30))
+
+# Fundo de cena do crime em tela cheia para as telas de abertura, tutorial e ranking
+fundo_cena_crime = carregar_imagem("cena_crime.jpg", (LARGURA, ALTURA), raio_borda=0, usar_escala=False)
+
+# Logo grande para a tela inicial (acima do formulário)
+logo_inicio_img = carregar_imagem("logosherlogic.jpeg", (520, 175), raio_borda=16)
+if not logo_inicio_img:
+    logo_inicio_img = carregar_imagem("sóalupalogo.jpeg", (150, 150), raio_borda=16)
+
+# Logo do painel do jogo (canto superior direito)
 logo_img = carregar_imagem("logosherlogic.jpeg", (230, 96), raio_borda=14)
 if not logo_img:
     logo_img = carregar_imagem("sóalupalogo.jpeg", (80, 80), raio_borda=14)
@@ -232,10 +248,11 @@ btn_pedir_pista = srect(20, 560, 460, 38)
 btn_acusar = srect(20, 605, 460, 38)
 btn_sair_jogo = srect(20, 650, 460, 35)
 
-# Tabela ampliada e melhor distribuída no painel direito
-tam_celula = 62
-ox = 735
-oy = 195
+# Células mais largas (96px) para comportar os nomes completos dos suspeitos
+larg_celula = 96
+alt_celula = 58
+ox = 675
+oy = 205
 
 # Dados Globais do Jogador
 nome_jogador = ""
@@ -260,6 +277,39 @@ animacao_nova_pista_y = 0.0
 altura_total_pistas = 0
 
 estado_jogo = iniciar_novo_jogo()
+
+
+def desenhar_fundo_inicial(superficie):
+    """Desenha a cena do crime no fundo com leve vinheta escura para leitura nítida."""
+    if fundo_cena_crime:
+        superficie.blit(fundo_cena_crime, (0, 0))
+        overlay = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+        overlay.fill((12, 16, 19, 95))
+        superficie.blit(overlay, (0, 0))
+    else:
+        superficie.fill(COR_ESQUERDA)
+
+
+def desenhar_logo_topo_central(superficie, y_logico=65):
+    """Desenha a logo grande do Sherlogic com moldura dourada acima da caixa central."""
+    if logo_inicio_img:
+        pos_x = (LARGURA - logo_inicio_img.get_width()) // 2
+        pos_y = sy(y_logico)
+        superficie.blit(logo_inicio_img, (pos_x, pos_y))
+        rect_externo = pygame.Rect(
+            pos_x - sw(4),
+            pos_y - sh(4),
+            logo_inicio_img.get_width() + sw(8),
+            logo_inicio_img.get_height() + sh(8)
+        )
+        rect_interno = pygame.Rect(
+            pos_x + sw(3),
+            pos_y + sh(3),
+            logo_inicio_img.get_width() - sw(6),
+            logo_inicio_img.get_height() - sh(6)
+        )
+        pygame.draw.rect(superficie, COR_AMARELO, rect_externo, max(2, sw(3)), border_radius=max(4, sw(18)))
+        pygame.draw.rect(superficie, COR_AMARELO, rect_interno, max(1, sw(1)), border_radius=max(3, sw(14)))
 
 
 def desenhar_botao(superficie, rect, cor_fundo, texto, fonte=fonte_botao, cor_texto=COR_TEXTO, raio=8):
@@ -309,51 +359,53 @@ rodando = True
 while rodando:
     # TELA DE DIGITAÇÃO DO NOME
     if etapa_atual == "NOME":
-        tela.fill(COR_ESQUERDA)
+        desenhar_fundo_inicial(tela)
+        desenhar_logo_topo_central(tela, y_logico=70)
 
-        rect_box = srect(350, 200, 500, 300)
+        rect_box = srect(350, 275, 500, 285)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
         pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
         txt_t = fonte_titulo.render("BEM-VINDO AO SHERLOGIC", True, COR_AMARELO)
-        tela.blit(txt_t, (sx(380), sy(230)))
+        tela.blit(txt_t, (sx(380), sy(305)))
 
         txt_sub = fonte_grelha.render("Digite o seu nome de detetive:", True, COR_TEXTO)
-        tela.blit(txt_sub, (sx(380), sy(280)))
+        tela.blit(txt_sub, (sx(380), sy(350)))
 
-        rect_input = srect(380, 320, 440, 45)
+        rect_input = srect(380, 390, 440, 45)
         pygame.draw.rect(tela, COR_CAMPO_TEXTO, rect_input, border_radius=sw(6))
         pygame.draw.rect(tela, COR_LINHA_DIVISORA, rect_input, 1, border_radius=sw(6))
 
         txt_nome = fonte_titulo.render(nome_jogador + "|", True, COR_AMARELO)
         tela.blit(txt_nome, (rect_input.x + sw(15), rect_input.y + sh(10)))
 
-        btn_avancar = srect(380, 400, 440, 45)
+        btn_avancar = srect(380, 468, 440, 48)
         desenhar_botao(tela, btn_avancar, COR_VERDE, "CONTINUAR", raio=8)
 
     # TELA DE PERGUNTA DO TUTORIAL
     elif etapa_atual == "PERGUNTA_TUTORIAL":
-        tela.fill(COR_ESQUERDA)
+        desenhar_fundo_inicial(tela)
+        desenhar_logo_topo_central(tela, y_logico=70)
 
-        rect_box = srect(350, 220, 500, 260)
+        rect_box = srect(350, 285, 500, 250)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
         pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
         txt_t = fonte_titulo.render(f"Olá, Detetive {nome_jogador}!", True, COR_AMARELO)
-        tela.blit(txt_t, (sx(380), sy(250)))
+        tela.blit(txt_t, (sx(380), sy(315)))
 
         txt_q = fonte_grelha.render("Deseja fazer o tutorial?", True, COR_TEXTO)
-        tela.blit(txt_q, (sx(380), sy(290)))
+        tela.blit(txt_q, (sx(380), sy(355)))
 
-        btn_sim = srect(380, 360, 200, 50)
+        btn_sim = srect(380, 420, 200, 50)
         desenhar_botao(tela, btn_sim, COR_VERDE, "SIM", raio=8)
 
-        btn_nao = srect(620, 360, 200, 50)
+        btn_nao = srect(620, 420, 200, 50)
         desenhar_botao(tela, btn_nao, COR_BOTAO_PISTA, "NÃO", raio=8)
 
     # TELA DE TUTORIAL
     elif etapa_atual == "TUTORIAL":
-        tela.fill(COR_ESQUERDA)
+        desenhar_fundo_inicial(tela)
 
         rect_tut = srect(200, 100, 800, 500)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_tut, border_radius=sw(12))
@@ -449,9 +501,17 @@ while rodando:
             True, COR_TEXTO
         )
         tela.blit(txt_tentativas, (sx(20), sy(88)))
+
+        # Relógio de bolso transparente ao lado do TEMPO
         cor_tempo = COR_VERMELHO if tempo_restante <= 10 else COR_AMARELO
         txt_tempo = fonte_grelha.render(f"TEMPO: {tempo_restante // 60:02d}:{tempo_restante % 60:02d}", True, cor_tempo)
-        tela.blit(txt_tempo, (sx(350), sy(70)))
+        pos_tempo_x = sx(480) - txt_tempo.get_width()
+        pos_tempo_y = sy(70)
+        tela.blit(txt_tempo, (pos_tempo_x, pos_tempo_y))
+        if img_relogio:
+            pos_rel_x = pos_tempo_x - img_relogio.get_width() - sw(6)
+            pos_rel_y = pos_tempo_y + (txt_tempo.get_height() - img_relogio.get_height()) // 2
+            tela.blit(img_relogio, (pos_rel_x, pos_rel_y))
 
         area_pistas = srect(10, 114, 480, 401)
         tela.set_clip(area_pistas)
@@ -487,7 +547,7 @@ while rodando:
         desenhar_botao(tela, btn_acusar, COR_BOTAO_ACUSAR, "FAZER ACUSAÇÃO [2]", raio=8)
         desenhar_botao(tela, btn_sair_jogo, COR_BOTAO_SAIR, "SAIR DO JOGO [ESC]", raio=8)
 
-        # 2. METADE DIREITA (GRELHA DE DEDUÇÃO AMPLIADA)
+        # 2. METADE DIREITA (GRELHA DE DEDUÇÃO COM COLUNAS LARGAS)
         pygame.draw.rect(tela, COR_DIREITA, (sx(500), 0, LARGURA - sx(500), ALTURA))
         pygame.draw.line(tela, COR_LINHA_DIVISORA, (sx(500), 0), (sx(500), ALTURA), max(2, sw(4)))
 
@@ -509,12 +569,12 @@ while rodando:
                 border_radius=max(2, sw(14))
             )
 
-        # Rótulos e fotos ampliadas dos Suspeitos (Topo)
+        # Rótulos completos e fotos dos Suspeitos centralizados nas colunas largas
         for col in range(4):
             nome_s = suspeitos[col]
             img_s = imgs_suspeitos.get(nome_s)
             if img_s:
-                pos_foto_x = sx(ox + col * tam_celula + (tam_celula - 58) // 2)
+                pos_foto_x = sx(ox + col * larg_celula + (larg_celula - 58) // 2)
                 pos_foto_y = sy(oy - 85)
                 tela.blit(img_s, (pos_foto_x, pos_foto_y))
                 pygame.draw.rect(
@@ -524,19 +584,19 @@ while rodando:
                     1,
                     border_radius=sw(6)
                 )
-            txt_col = fonte_grelha.render(nome_s[:4], True, COR_AMARELO)
-            pos_texto_x = sx(ox + col * tam_celula) + (sw(tam_celula) - txt_col.get_width()) // 2
+            txt_col = fonte_grelha.render(nome_s, True, COR_AMARELO)
+            pos_texto_x = sx(ox + col * larg_celula) + (sw(larg_celula) - txt_col.get_width()) // 2
             tela.blit(txt_col, (pos_texto_x, sy(oy - 23)))
 
-        # Desenho da Tabela Ampliada
+        # Desenho da Tabela com Células Mais Largas
         for lin in range(8):
             cor_rotulo = COR_AMARELO if lin < 4 else COR_TEXTO
             txt_lin = fonte_grelha.render(itens_laterais[lin][:10], True, cor_rotulo)
-            pos_rotulo_y = sy(oy + lin * tam_celula) + (sh(tam_celula) - txt_lin.get_height()) // 2
-            tela.blit(txt_lin, (sx(ox - 135), pos_rotulo_y))
+            pos_rotulo_y = sy(oy + lin * alt_celula) + (sh(alt_celula) - txt_lin.get_height()) // 2
+            tela.blit(txt_lin, (sx(ox - 125), pos_rotulo_y))
 
             for col in range(4):
-                rect = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula - 3, tam_celula - 3)
+                rect = srect(ox + col * larg_celula, oy + lin * alt_celula, larg_celula - 4, alt_celula - 3)
                 pygame.draw.rect(tela, COR_CELULA, rect, border_radius=sw(8))
                 pygame.draw.rect(tela, (61, 76, 78), rect, 1, border_radius=sw(8))
 
@@ -551,8 +611,8 @@ while rodando:
         pygame.draw.line(
             tela,
             COR_DIVISOR_TABELA,
-            (sx(ox - 135), sy(oy + 4 * tam_celula - 2)),
-            (sx(ox + 4 * tam_celula), sy(oy + 4 * tam_celula - 2)),
+            (sx(ox - 125), sy(oy + 4 * alt_celula - 2)),
+            (sx(ox + 4 * larg_celula), sy(oy + 4 * alt_celula - 2)),
             max(2, sw(3))
         )
 
@@ -650,9 +710,9 @@ while rodando:
                 btn_sair = srect(600, 430, 220, 50)
                 desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR", raio=8)
 
-    # TELA DE RANKING FINAL
+    # TELA DE RANKING FINAL (COM O FUNDO DA CENA DO CRIME)
     elif etapa_atual == "RANKING_FINAL":
-        tela.fill(COR_ESQUERDA)
+        desenhar_fundo_inicial(tela)
 
         rect_box = srect(320, 150, 560, 400)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
@@ -740,13 +800,13 @@ while rodando:
             pos_mouse = evento.pos
 
             if etapa_atual == "NOME":
-                btn_avancar = srect(380, 400, 440, 45)
+                btn_avancar = srect(380, 468, 440, 48)
                 if btn_avancar.collidepoint(pos_mouse) and nome_jogador.strip():
                     etapa_atual = "PERGUNTA_TUTORIAL"
 
             elif etapa_atual == "PERGUNTA_TUTORIAL":
-                btn_sim = srect(380, 360, 200, 50)
-                btn_nao = srect(620, 360, 200, 50)
+                btn_sim = srect(380, 420, 200, 50)
+                btn_nao = srect(620, 420, 200, 50)
 
                 if btn_sim.collidepoint(pos_mouse):
                     etapa_atual = "TUTORIAL"
@@ -867,7 +927,7 @@ while rodando:
 
                     for lin in range(8):
                         for col in range(4):
-                            r = srect(ox + col * tam_celula, oy + lin * tam_celula, tam_celula, tam_celula)
+                            r = srect(ox + col * larg_celula, oy + lin * alt_celula, larg_celula, alt_celula)
                             if r.collidepoint(pos_mouse):
                                 estado_jogo["grelha_unica"][lin][col] = (estado_jogo["grelha_unica"][lin][col] + 1) % 3
 
