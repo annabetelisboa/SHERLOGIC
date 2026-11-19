@@ -314,10 +314,26 @@ def desenhar_logo_topo_central(superficie, y_logico=65):
 
 def desenhar_botao(superficie, rect, cor_fundo, texto, fonte=fonte_botao, cor_texto=COR_TEXTO, raio=8):
     pygame.draw.rect(superficie, cor_fundo, rect, border_radius=sw(raio))
-    txt_surf = fonte.render(texto, True, cor_texto)
+    fonte_uso = fonte
+    largura_max_texto = rect.width - sw(20)
+    if fonte_uso.size(texto)[0] > largura_max_texto:
+        tam_base = max(12, int(20 * ESCALA))
+        while tam_base > 10:
+            fonte_teste = pygame.font.SysFont("georgia,bookantiqua,timesnewroman,serif", tam_base, bold=True)
+            if fonte_teste.size(texto)[0] <= largura_max_texto:
+                fonte_uso = fonte_teste
+                break
+            tam_base -= 1
+    txt_surf = fonte_uso.render(texto, True, cor_texto)
     pos_x = rect.x + (rect.width - txt_surf.get_width()) // 2
     pos_y = rect.y + (rect.height - txt_surf.get_height()) // 2
     superficie.blit(txt_surf, (pos_x, pos_y))
+
+
+def desenhar_texto_centralizado(superficie, texto, centro_x_logico, y_logico, fonte, cor):
+    txt_surf = fonte.render(texto, True, cor)
+    pos_x = sx(centro_x_logico) - txt_surf.get_width() // 2
+    superficie.blit(txt_surf, (pos_x, sy(y_logico)))
 
 
 def desenhar_texto_multilinhas(superficie, texto, x_logico, y_logico, largura_max_logica, fonte, cor, desenhar=True):
@@ -668,7 +684,7 @@ while rodando:
             btn_cancelar = srect(610, 430, 220, 45)
             desenhar_botao(tela, btn_cancelar, COR_VERMELHO, "CANCELAR", raio=8)
 
-        # 5. MODAL DE FIM DE JOGO (CASO RESOLVIDO)
+        # 5. MODAL DE FIM DE JOGO (CENTRALIZADO)
         if estado_jogo["jogo_encerrado"]:
             s_overlay = pygame.Surface((LARGURA, ALTURA))
             s_overlay.set_alpha(220)
@@ -680,34 +696,43 @@ while rodando:
             pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
             pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
+            centro_modal_x = 600  # 320 + 560 / 2
+
             if tempo_esgotado:
                 if img_fim_de_jogo:
-                    tela.blit(img_fim_de_jogo, (sx(400), sy(110)))
+                    tela.blit(img_fim_de_jogo, (sx(centro_modal_x - 200), sy(110)))
                 else:
-                    tela.blit(fonte_titulo.render("FIM DE JOGO", True, COR_VERMELHO), (sx(515), sy(125)))
+                    desenhar_texto_centralizado(tela, "FIM DE JOGO", centro_modal_x, 125, fonte_titulo, COR_VERMELHO)
+
                 mensagem_fim = "ACABARAM AS TENTATIVAS!" if estado_jogo["mensagem_resultado"].startswith("ACABARAM AS TENTATIVAS") else "TEMPO ESGOTADO!"
-                tela.blit(fonte_titulo.render(mensagem_fim, True, COR_VERMELHO), (sx(500), sy(350)))
-                tela.blit(fonte_titulo.render("Deseja jogar novamente?", True, COR_TEXTO), (sx(460), sy(390)))
-                btn_reiniciar = srect(360, 470, 220, 50)
-                btn_sair = srect(600, 470, 220, 50)
+                desenhar_texto_centralizado(tela, mensagem_fim, centro_modal_x, 355, fonte_titulo, COR_VERMELHO)
+                desenhar_texto_centralizado(tela, "Deseja jogar novamente?", centro_modal_x, 398, fonte_titulo, COR_TEXTO)
+
+                btn_reiniciar = srect(355, 470, 230, 52)
+                btn_sair = srect(615, 470, 230, 52)
                 desenhar_botao(tela, btn_reiniciar, COR_VERDE, "JOGAR NOVAMENTE", raio=8)
                 desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR DO JOGO", raio=8)
             else:
-                txt_vit = fonte_titulo.render("CASO RESOLVIDO COM SUCESSO!", True, COR_VERDE)
-                tela.blit(txt_vit, (sx(350), sy(200)))
+                desenhar_texto_centralizado(tela, "CASO RESOLVIDO COM SUCESSO!", centro_modal_x, 185, fonte_titulo, COR_VERDE)
                 img_culpado = imgs_suspeitos_modal.get(estado_jogo["culpado"])
                 if img_culpado:
-                    tela.blit(img_culpado, (sx(555), sy(240)))
-                txt_sol = fonte_pista.render(
+                    tela.blit(img_culpado, (sx(centro_modal_x - 45), sy(225)))
+
+                desenhar_texto_centralizado(
+                    tela,
                     f"Culpado: {estado_jogo['culpado']}  |  Arma: {estado_jogo['arma_real']}  |  Local: {estado_jogo['local_real']}",
-                    True, COR_AMARELO
+                    centro_modal_x, 330, fonte_pista, COR_AMARELO
                 )
-                tela.blit(txt_sol, (sx(350), sy(345)))
-                tela.blit(fonte_titulo.render("Deseja jogar um novo enigma?", True, COR_TEXTO), (sx(440), sy(380)))
-                btn_reiniciar = srect(360, 430, 220, 50)
+                desenhar_texto_centralizado(tela, "Deseja jogar um novo enigma?", centro_modal_x, 365, fonte_titulo, COR_TEXTO)
+                desenhar_texto_centralizado(
+                    tela,
+                    f"O próximo caso será a fase {nivel_atual + 1}.",
+                    centro_modal_x, 400, fonte_pista, COR_AMARELO
+                )
+
+                btn_reiniciar = srect(355, 445, 230, 52)
+                btn_sair = srect(615, 445, 230, 52)
                 desenhar_botao(tela, btn_reiniciar, COR_VERDE, "PRÓXIMA FASE", raio=8)
-                tela.blit(fonte_pista.render(f"O próximo caso será a fase {nivel_atual + 1}.", True, COR_AMARELO), (sx(440), sy(410)))
-                btn_sair = srect(600, 430, 220, 50)
                 desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR", raio=8)
 
     # TELA DE RANKING FINAL (COM O FUNDO DA CENA DO CRIME)
@@ -831,9 +856,9 @@ while rodando:
             elif etapa_atual == "JOGO":
                 if estado_jogo["jogo_encerrado"]:
                     tempo_esgotado = estado_jogo["mensagem_resultado"].startswith(("TEMPO ESGOTADO", "ACABARAM AS TENTATIVAS"))
-                    y_botoes = 470 if tempo_esgotado else 430
-                    btn_reiniciar = srect(360, y_botoes, 220, 50)
-                    btn_sair = srect(600, y_botoes, 220, 50)
+                    y_botoes = 470 if tempo_esgotado else 445
+                    btn_reiniciar = srect(355, y_botoes, 230, 52)
+                    btn_sair = srect(615, y_botoes, 230, 52)
 
                     if btn_reiniciar.collidepoint(pos_mouse):
                         if not tempo_esgotado:
