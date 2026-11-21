@@ -26,7 +26,10 @@ def tempo_limite_fase(fase):
     return max(30, 90 - (fase - 1) * 10)
 
 
-# FUNÇÕES DE GERENCIAMENTO DO RANKING TOP 5 (COMEÇA VAZIO)
+# FUNÇÕES DE GERENCIAMENTO DO RANKING TOP 10 (COMEÇA VAZIO)
+TAMANHO_RANKING = 10
+
+
 def caminho_arquivo_ranking():
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(diretorio_base, "ranking.json")
@@ -39,7 +42,7 @@ def carregar_ranking():
             with open(caminho, "r", encoding="utf-8") as f:
                 dados = json.load(f)
                 if isinstance(dados, list):
-                    return dados[:5]
+                    return dados[:TAMANHO_RANKING]
         except Exception:
             pass
     return []
@@ -51,13 +54,13 @@ def registrar_no_ranking(nome, pontos, casos):
     if nome_limpo:
         lista.append({"nome": nome_limpo, "pontos": pontos, "casos": casos})
     lista.sort(key=lambda item: (item["pontos"], item["casos"]), reverse=True)
-    top_5 = lista[:5]
+    top_ranking = lista[:TAMANHO_RANKING]
     try:
         with open(caminho_arquivo_ranking(), "w", encoding="utf-8") as f:
-            json.dump(top_5, f, ensure_ascii=False, indent=2)
+            json.dump(top_ranking, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
-    return top_5
+    return top_ranking
 
 
 # FUNÇÃO PARA REINICIAR O JOGO
@@ -306,7 +309,7 @@ nome_jogador = ""
 pontuacao_total = 0
 casos_resolvidos = 0
 nivel_atual = 1
-ranking_top_5 = carregar_ranking()
+ranking_top = carregar_ranking()
 
 # Etapas do Jogo: "NOME", "PERGUNTA_TUTORIAL", "TUTORIAL", "JOGO", "RANKING_FINAL"
 etapa_atual = "NOME"
@@ -328,8 +331,8 @@ estado_jogo = iniciar_novo_jogo()
 
 
 def abrir_ranking_final():
-    global etapa_atual, ranking_top_5
-    ranking_top_5 = registrar_no_ranking(nome_jogador, pontuacao_total, casos_resolvidos)
+    global etapa_atual, ranking_top
+    ranking_top = registrar_no_ranking(nome_jogador, pontuacao_total, casos_resolvidos)
     etapa_atual = "RANKING_FINAL"
 
 
@@ -800,18 +803,18 @@ while rodando:
                 desenhar_botao(tela, btn_reiniciar, COR_VERDE, "PRÓXIMA FASE", raio=8)
                 desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR", raio=8)
 
-    # TELA DE RANKING FINAL COM TOP 5 DETETIVES
+    # TELA DE RANKING FINAL COM TOP 10 DETETIVES
     elif etapa_atual == "RANKING_FINAL":
         desenhar_fundo_inicial(tela)
 
-        rect_box = srect(280, 95, 640, 535)
+        rect_box = srect(280, 30, 640, 660)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
         pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
-        desenhar_texto_centralizado(tela, "RANKING FINAL DO INVESTIGADOR", 600, 120, fonte_titulo, COR_AMARELO)
+        desenhar_texto_centralizado(tela, "RANKING FINAL DO INVESTIGADOR", 600, 55, fonte_titulo, COR_AMARELO)
 
         # Cartão de resumo da sessão atual do jogador
-        rect_resumo = srect(315, 160, 570, 62)
+        rect_resumo = srect(315, 85, 570, 58)
         pygame.draw.rect(tela, COR_CARTAO, rect_resumo, border_radius=sw(8))
         pygame.draw.rect(tela, COR_LINHA_DIVISORA, rect_resumo, 1, border_radius=sw(8))
 
@@ -819,21 +822,21 @@ while rodando:
             f"Detetive: {nome_jogador}   •   Casos Resolvidos: {casos_resolvidos}",
             True, COR_TEXTO
         )
-        tela.blit(txt_sessao, (sx(335), sy(170)))
+        tela.blit(txt_sessao, (sx(335), sy(93)))
 
         txt_pts = fonte_grelha.render(f"Sua Pontuação Nesta Sessão: {pontuacao_total} pts", True, COR_VERDE)
-        tela.blit(txt_pts, (sx(335), sy(193)))
+        tela.blit(txt_pts, (sx(335), sy(116)))
 
-        # Cabeçalho da Tabela Top 5
-        desenhar_texto_centralizado(tela, "TOP 5 MELHORES DETETIVES", 600, 242, fonte_grelha, COR_AMARELO)
+        # Cabeçalho da Tabela Top 10
+        desenhar_texto_centralizado(tela, f"TOP {TAMANHO_RANKING} MELHORES DETETIVES", 600, 163, fonte_grelha, COR_AMARELO)
 
-        # Desenho das 5 linhas do Ranking (preenchidas conforme os jogadores jogam)
-        y_linha = 274
-        for idx in range(5):
-            rect_row = srect(315, y_linha, 570, 42)
+        # Desenho das 10 linhas do Ranking (preenchidas conforme os jogadores jogam)
+        y_linha = 185
+        for idx in range(TAMANHO_RANKING):
+            rect_row = srect(315, y_linha, 570, 36)
 
-            if idx < len(ranking_top_5):
-                entry = ranking_top_5[idx]
+            if idx < len(ranking_top):
+                entry = ranking_top[idx]
                 eh_jogador_atual = (
                     entry["nome"].strip().lower() == nome_jogador.strip().lower()
                     and entry["pontos"] == pontuacao_total
@@ -846,35 +849,35 @@ while rodando:
 
                 cor_pos = COR_AMARELO if idx == 0 else (COR_VERDE if eh_jogador_atual else COR_TEXTO)
                 txt_pos = fonte_grelha.render(f"#{idx + 1}", True, cor_pos)
-                tela.blit(txt_pos, (sx(332), sy(y_linha + 11)))
+                tela.blit(txt_pos, (sx(332), sy(y_linha + 8)))
 
                 txt_nome_r = fonte_grelha.render(entry["nome"][:16], True, COR_AMARELO if eh_jogador_atual else COR_TEXTO)
-                tela.blit(txt_nome_r, (sx(385), sy(y_linha + 11)))
+                tela.blit(txt_nome_r, (sx(385), sy(y_linha + 8)))
 
                 txt_casos_r = fonte_pista.render(
                     f"{entry['casos']} caso(s)",
                     True, COR_TEXTO if eh_jogador_atual else COR_LINHA_DIVISORA
                 )
-                tela.blit(txt_casos_r, (sx(620), sy(y_linha + 11)))
+                tela.blit(txt_casos_r, (sx(620), sy(y_linha + 8)))
 
                 txt_pts_r = fonte_grelha.render(
                     f"{entry['pontos']} pts",
                     True, COR_AMARELO if idx == 0 or eh_jogador_atual else COR_VERDE
                 )
-                tela.blit(txt_pts_r, (sx(870) - txt_pts_r.get_width(), sy(y_linha + 11)))
+                tela.blit(txt_pts_r, (sx(870) - txt_pts_r.get_width(), sy(y_linha + 8)))
             else:
                 pygame.draw.rect(tela, COR_CARTAO, rect_row, border_radius=sw(6))
                 pygame.draw.rect(tela, (45, 56, 59), rect_row, 1, border_radius=sw(6))
 
                 txt_pos = fonte_grelha.render(f"#{idx + 1}", True, COR_LINHA_DIVISORA)
-                tela.blit(txt_pos, (sx(332), sy(y_linha + 11)))
+                tela.blit(txt_pos, (sx(332), sy(y_linha + 8)))
 
                 txt_vazio = fonte_pista.render("--- Vaga disponível ---", True, COR_LINHA_DIVISORA)
-                tela.blit(txt_vazio, (sx(385), sy(y_linha + 11)))
+                tela.blit(txt_vazio, (sx(385), sy(y_linha + 8)))
 
-            y_linha += 49
+            y_linha += 40
 
-        btn_fechar = srect(350, 545, 500, 50)
+        btn_fechar = srect(350, 600, 500, 50)
         desenhar_botao(tela, btn_fechar, COR_VERMELHO, "FECHAR JOGO", raio=8)
 
     # GERENCIAMENTO DE EVENTOS DE ENTRADA
@@ -1073,7 +1076,7 @@ while rodando:
                                 estado_jogo["grelha_unica"][lin][col] = (estado_jogo["grelha_unica"][lin][col] + 1) % 3
 
             elif etapa_atual == "RANKING_FINAL":
-                btn_fechar = srect(350, 545, 500, 50)
+                btn_fechar = srect(350, 600, 500, 50)
                 if btn_fechar.collidepoint(pos_mouse):
                     rodando = False
 
