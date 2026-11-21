@@ -15,6 +15,16 @@ except Exception:
         pass
 
 
+def limite_pistas_fase(fase):
+    """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
+    return 10 if fase == 1 else max(5, 10 - (fase - 1))
+
+
+def tempo_limite_fase(fase):
+    """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
+    return max(30, 90 - (fase - 1) * 10)
+
+
 # FUNÇÃO PARA REINICIAR O JOGO
 def iniciar_novo_jogo():
     suspeitos = ["Mordomo", "Cozinheira", "Jardineiro", "Motorista"]
@@ -105,16 +115,6 @@ def iniciar_novo_jogo():
     }
 
 
-def limite_pistas_fase(fase):
-    """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
-    return 10 if fase == 1 else max(5, 10 - (fase - 1))
-
-
-def tempo_limite_fase(fase):
-    """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
-    return max(30, 90 - (fase - 1) * 10)
-
-
 # INICIALIZAÇÃO DO PYGAME EM TELA CHEIA COM ESCALA NATIVA NÍTIDA
 pygame.init()
 info_monitor = pygame.display.Info()
@@ -164,13 +164,14 @@ def arredondar_imagem(superficie, raio):
 
 def carregar_imagem(caminho, tamanho, raio_borda=0, usar_escala=True):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
+    pasta_imagens = os.path.join(diretorio_base, "imagens")
     nome_base = os.path.splitext(caminho)[0]
     if usar_escala:
         tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
     else:
         tamanho_escalado = (max(1, int(tamanho[0])), max(1, int(tamanho[1])))
     for extensao in (".png", ".jpeg", ".jpg", ".PNG", ".JPEG", ".JPG"):
-        caminho_completo = os.path.join(diretorio_base, nome_base + extensao)
+        caminho_completo = os.path.join(pasta_imagens, nome_base + extensao)
         if os.path.exists(caminho_completo):
             try:
                 img = pygame.image.load(caminho_completo).convert_alpha()
@@ -331,9 +332,11 @@ def desenhar_texto_multilinhas(superficie, texto, x_logico, y_logico, largura_ma
         if fonte.size(test_line)[0] <= largura_max_real:
             linha_atual = test_line
         else:
-            linhas.append(linha_atual)
+            if linha_atual:
+                linhas.append(linha_atual)
             linha_atual = palavra + " "
-    linhas.append(linha_atual)
+    if linha_atual:
+        linhas.append(linha_atual)
 
     altura_y = y_logico
     passo_linha = (fonte.get_height() / ESCALA) + 5
@@ -523,16 +526,25 @@ while rodando:
             if i == len(estado_jogo["pistas_reveladas"]) - 1:
                 y_atual += animacao_nova_pista_y
 
+            texto_formula = f"EVIDÊNCIA {i+1}  ·  {p['formula']}"
             historia = f'"{p["historia"]}"'
+
+            y_fim_formula = desenhar_texto_multilinhas(
+                tela, texto_formula, 28, y_atual + 4, 440, fonte_formula, COR_AMARELO, desenhar=False
+            )
             altura_texto = desenhar_texto_multilinhas(
-                tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=False
+                tela, historia, 28, y_fim_formula + 4, 440, fonte_pista, COR_TEXTO, desenhar=False
             )
             altura_card = max(60, altura_texto - y_atual + 8)
             pygame.draw.rect(tela, COR_CARTAO, srect(14, y_atual - 3, 472, altura_card), border_radius=sw(8))
             pygame.draw.rect(tela, COR_AMARELO, srect(14, y_atual - 3, 4, altura_card), border_radius=sw(3))
-            txt_f = fonte_formula.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
-            tela.blit(txt_f, (sx(28), sy(y_atual + 3)))
-            desenhar_texto_multilinhas(tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=True)
+
+            desenhar_texto_multilinhas(
+                tela, texto_formula, 28, y_atual + 4, 440, fonte_formula, COR_AMARELO, desenhar=True
+            )
+            desenhar_texto_multilinhas(
+                tela, historia, 28, y_fim_formula + 4, 440, fonte_pista, COR_TEXTO, desenhar=True
+            )
             altura_acumulada += altura_card + 12
 
         altura_total_pistas = altura_acumulada
@@ -785,7 +797,7 @@ while rodando:
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 140 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -914,7 +926,7 @@ while rodando:
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 140 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
