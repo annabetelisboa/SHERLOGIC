@@ -117,6 +117,15 @@ def tempo_limite_fase(fase):
 
 # INICIALIZAÇÃO DO PYGAME EM TELA CHEIA COM ESCALA NATIVA NÍTIDA
 pygame.init()
+# TRILHA SONORA
+try:
+    pygame.mixer.init()
+    caminho_musica = os.path.join(os.path.dirname(os.path.abspath(__file__)), "musica", "sherlogic-musica.mp3")
+    pygame.mixer.music.load(caminho_musica)
+    pygame.mixer.music.set_volume(0.5)
+    pygame.mixer.music.play(-1)  # repete sem parar
+except Exception as erro:
+    print("Não consegui tocar a música:", erro)
 info_monitor = pygame.display.Info()
 LARGURA = info_monitor.current_w
 ALTURA = info_monitor.current_h
