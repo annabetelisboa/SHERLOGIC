@@ -4,6 +4,7 @@ import sys
 import os
 import time
 import ctypes
+import json
 
 # Ativa nitidez nativa no Windows (evita zoom borrado de DPI)
 try:
@@ -13,6 +14,50 @@ except Exception:
         ctypes.windll.user32.SetProcessDPIAware()
     except Exception:
         pass
+
+
+def limite_pistas_fase(fase):
+    """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
+    return 10 if fase == 1 else max(5, 10 - (fase - 1))
+
+
+def tempo_limite_fase(fase):
+    """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
+    return max(30, 90 - (fase - 1) * 10)
+
+
+# FUNÇÕES DE GERENCIAMENTO DO RANKING TOP 5 (COMEÇA VAZIO)
+def caminho_arquivo_ranking():
+    diretorio_base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(diretorio_base, "ranking.json")
+
+
+def carregar_ranking():
+    caminho = caminho_arquivo_ranking()
+    if os.path.exists(caminho):
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                if isinstance(dados, list):
+                    return dados[:5]
+        except Exception:
+            pass
+    return []
+
+
+def registrar_no_ranking(nome, pontos, casos):
+    lista = carregar_ranking()
+    nome_limpo = nome.strip()
+    if nome_limpo:
+        lista.append({"nome": nome_limpo, "pontos": pontos, "casos": casos})
+    lista.sort(key=lambda item: (item["pontos"], item["casos"]), reverse=True)
+    top_5 = lista[:5]
+    try:
+        with open(caminho_arquivo_ranking(), "w", encoding="utf-8") as f:
+            json.dump(top_5, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return top_5
 
 
 # FUNÇÃO PARA REINICIAR O JOGO
@@ -105,18 +150,9 @@ def iniciar_novo_jogo():
     }
 
 
-def limite_pistas_fase(fase):
-    """Reduz as pistas disponíveis gradualmente, sem alterar as regras do caso."""
-    return 10 if fase == 1 else max(5, 10 - (fase - 1))
-
-
-def tempo_limite_fase(fase):
-    """Começa em 1 minuto e meio (90s) e reduz 10s por fase até o mínimo de 30s."""
-    return max(30, 90 - (fase - 1) * 10)
-
-
 # INICIALIZAÇÃO DO PYGAME EM TELA CHEIA COM ESCALA NATIVA NÍTIDA
 pygame.init()
+
 # TRILHA SONORA
 try:
     pygame.mixer.init()
@@ -126,6 +162,7 @@ try:
     pygame.mixer.music.play(-1)  # repete sem parar
 except Exception as erro:
     print("Não consegui tocar a música:", erro)
+
 info_monitor = pygame.display.Info()
 LARGURA = info_monitor.current_w
 ALTURA = info_monitor.current_h
@@ -173,13 +210,14 @@ def arredondar_imagem(superficie, raio):
 
 def carregar_imagem(caminho, tamanho, raio_borda=0, usar_escala=True):
     diretorio_base = os.path.dirname(os.path.abspath(__file__))
+    pasta_imagens = os.path.join(diretorio_base, "imagens")
     nome_base = os.path.splitext(caminho)[0]
     if usar_escala:
         tamanho_escalado = (max(1, sw(tamanho[0])), max(1, sh(tamanho[1])))
     else:
         tamanho_escalado = (max(1, int(tamanho[0])), max(1, int(tamanho[1])))
     for extensao in (".png", ".jpeg", ".jpg", ".PNG", ".JPEG", ".JPG"):
-        caminho_completo = os.path.join(diretorio_base, nome_base + extensao)
+        caminho_completo = os.path.join(pasta_imagens, nome_base + extensao)
         if os.path.exists(caminho_completo):
             try:
                 img = pygame.image.load(caminho_completo).convert_alpha()
@@ -268,6 +306,7 @@ nome_jogador = ""
 pontuacao_total = 0
 casos_resolvidos = 0
 nivel_atual = 1
+ranking_top_5 = carregar_ranking()
 
 # Etapas do Jogo: "NOME", "PERGUNTA_TUTORIAL", "TUTORIAL", "JOGO", "RANKING_FINAL"
 etapa_atual = "NOME"
@@ -286,6 +325,12 @@ animacao_nova_pista_y = 0.0
 altura_total_pistas = 0
 
 estado_jogo = iniciar_novo_jogo()
+
+
+def abrir_ranking_final():
+    global etapa_atual, ranking_top_5
+    ranking_top_5 = registrar_no_ranking(nome_jogador, pontuacao_total, casos_resolvidos)
+    etapa_atual = "RANKING_FINAL"
 
 
 def desenhar_fundo_inicial(superficie):
@@ -356,9 +401,11 @@ def desenhar_texto_multilinhas(superficie, texto, x_logico, y_logico, largura_ma
         if fonte.size(test_line)[0] <= largura_max_real:
             linha_atual = test_line
         else:
-            linhas.append(linha_atual)
+            if linha_atual:
+                linhas.append(linha_atual)
             linha_atual = palavra + " "
-    linhas.append(linha_atual)
+    if linha_atual:
+        linhas.append(linha_atual)
 
     altura_y = y_logico
     passo_linha = (fonte.get_height() / ESCALA) + 5
@@ -548,16 +595,25 @@ while rodando:
             if i == len(estado_jogo["pistas_reveladas"]) - 1:
                 y_atual += animacao_nova_pista_y
 
+            texto_formula = f"EVIDÊNCIA {i+1}  ·  {p['formula']}"
             historia = f'"{p["historia"]}"'
+
+            y_fim_formula = desenhar_texto_multilinhas(
+                tela, texto_formula, 28, y_atual + 4, 440, fonte_formula, COR_AMARELO, desenhar=False
+            )
             altura_texto = desenhar_texto_multilinhas(
-                tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=False
+                tela, historia, 28, y_fim_formula + 4, 440, fonte_pista, COR_TEXTO, desenhar=False
             )
             altura_card = max(60, altura_texto - y_atual + 8)
             pygame.draw.rect(tela, COR_CARTAO, srect(14, y_atual - 3, 472, altura_card), border_radius=sw(8))
             pygame.draw.rect(tela, COR_AMARELO, srect(14, y_atual - 3, 4, altura_card), border_radius=sw(3))
-            txt_f = fonte_formula.render(f"EVIDÊNCIA {i+1}  ·  {p['formula']}", True, COR_AMARELO)
-            tela.blit(txt_f, (sx(28), sy(y_atual + 3)))
-            desenhar_texto_multilinhas(tela, historia, 28, y_atual + 28, 440, fonte_pista, COR_TEXTO, desenhar=True)
+
+            desenhar_texto_multilinhas(
+                tela, texto_formula, 28, y_atual + 4, 440, fonte_formula, COR_AMARELO, desenhar=True
+            )
+            desenhar_texto_multilinhas(
+                tela, historia, 28, y_fim_formula + 4, 440, fonte_pista, COR_TEXTO, desenhar=True
+            )
             altura_acumulada += altura_card + 12
 
         altura_total_pistas = altura_acumulada
@@ -705,7 +761,7 @@ while rodando:
             pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
             pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
-            centro_modal_x = 600  # 320 + 560 / 2
+            centro_modal_x = 600
 
             if tempo_esgotado:
                 if img_fim_de_jogo:
@@ -744,30 +800,81 @@ while rodando:
                 desenhar_botao(tela, btn_reiniciar, COR_VERDE, "PRÓXIMA FASE", raio=8)
                 desenhar_botao(tela, btn_sair, COR_VERMELHO, "SAIR", raio=8)
 
-    # TELA DE RANKING FINAL (COM O FUNDO DA CENA DO CRIME)
+    # TELA DE RANKING FINAL COM TOP 5 DETETIVES
     elif etapa_atual == "RANKING_FINAL":
         desenhar_fundo_inicial(tela)
 
-        rect_box = srect(320, 150, 560, 400)
+        rect_box = srect(280, 95, 640, 535)
         pygame.draw.rect(tela, COR_MODAL_FUNDO, rect_box, border_radius=sw(12))
         pygame.draw.rect(tela, COR_AMARELO, rect_box, max(1, sw(2)), border_radius=sw(12))
 
-        txt_t = fonte_titulo.render("RANKING FINAL DO INVESTIGADOR", True, COR_AMARELO)
-        tela.blit(txt_t, (sx(350), sy(180)))
+        desenhar_texto_centralizado(tela, "RANKING FINAL DO INVESTIGADOR", 600, 120, fonte_titulo, COR_AMARELO)
 
-        txt_p = fonte_grelha.render(f"Detetive: {nome_jogador}", True, COR_TEXTO)
-        tela.blit(txt_p, (sx(350), sy(230)))
+        # Cartão de resumo da sessão atual do jogador
+        rect_resumo = srect(315, 160, 570, 62)
+        pygame.draw.rect(tela, COR_CARTAO, rect_resumo, border_radius=sw(8))
+        pygame.draw.rect(tela, COR_LINHA_DIVISORA, rect_resumo, 1, border_radius=sw(8))
 
-        txt_c = fonte_grelha.render(f"Casos Resolvidos: {casos_resolvidos}", True, COR_TEXTO)
-        tela.blit(txt_c, (sx(350), sy(260)))
+        txt_sessao = fonte_grelha.render(
+            f"Detetive: {nome_jogador}   •   Casos Resolvidos: {casos_resolvidos}",
+            True, COR_TEXTO
+        )
+        tela.blit(txt_sessao, (sx(335), sy(170)))
 
-        txt_pts = fonte_titulo.render(f"Pontuação Total: {pontuacao_total} pts", True, COR_VERDE)
-        tela.blit(txt_pts, (sx(350), sy(300)))
+        txt_pts = fonte_grelha.render(f"Sua Pontuação Nesta Sessão: {pontuacao_total} pts", True, COR_VERDE)
+        tela.blit(txt_pts, (sx(335), sy(193)))
 
-        txt_msg = fonte_pista.render("Obrigado por jogar SHERLOGIC!", True, COR_TEXTO)
-        tela.blit(txt_msg, (sx(350), sy(360)))
+        # Cabeçalho da Tabela Top 5
+        desenhar_texto_centralizado(tela, "TOP 5 MELHORES DETETIVES", 600, 242, fonte_grelha, COR_AMARELO)
 
-        btn_fechar = srect(350, 440, 500, 50)
+        # Desenho das 5 linhas do Ranking (preenchidas conforme os jogadores jogam)
+        y_linha = 274
+        for idx in range(5):
+            rect_row = srect(315, y_linha, 570, 42)
+
+            if idx < len(ranking_top_5):
+                entry = ranking_top_5[idx]
+                eh_jogador_atual = (
+                    entry["nome"].strip().lower() == nome_jogador.strip().lower()
+                    and entry["pontos"] == pontuacao_total
+                )
+                cor_fundo_row = (48, 63, 68) if eh_jogador_atual else COR_CARTAO
+                cor_borda_row = COR_AMARELO if eh_jogador_atual else (58, 72, 75)
+
+                pygame.draw.rect(tela, cor_fundo_row, rect_row, border_radius=sw(6))
+                pygame.draw.rect(tela, cor_borda_row, rect_row, 1, border_radius=sw(6))
+
+                cor_pos = COR_AMARELO if idx == 0 else (COR_VERDE if eh_jogador_atual else COR_TEXTO)
+                txt_pos = fonte_grelha.render(f"#{idx + 1}", True, cor_pos)
+                tela.blit(txt_pos, (sx(332), sy(y_linha + 11)))
+
+                txt_nome_r = fonte_grelha.render(entry["nome"][:16], True, COR_AMARELO if eh_jogador_atual else COR_TEXTO)
+                tela.blit(txt_nome_r, (sx(385), sy(y_linha + 11)))
+
+                txt_casos_r = fonte_pista.render(
+                    f"{entry['casos']} caso(s)",
+                    True, COR_TEXTO if eh_jogador_atual else COR_LINHA_DIVISORA
+                )
+                tela.blit(txt_casos_r, (sx(620), sy(y_linha + 11)))
+
+                txt_pts_r = fonte_grelha.render(
+                    f"{entry['pontos']} pts",
+                    True, COR_AMARELO if idx == 0 or eh_jogador_atual else COR_VERDE
+                )
+                tela.blit(txt_pts_r, (sx(870) - txt_pts_r.get_width(), sy(y_linha + 11)))
+            else:
+                pygame.draw.rect(tela, COR_CARTAO, rect_row, border_radius=sw(6))
+                pygame.draw.rect(tela, (45, 56, 59), rect_row, 1, border_radius=sw(6))
+
+                txt_pos = fonte_grelha.render(f"#{idx + 1}", True, COR_LINHA_DIVISORA)
+                tela.blit(txt_pos, (sx(332), sy(y_linha + 11)))
+
+                txt_vazio = fonte_pista.render("--- Vaga disponível ---", True, COR_LINHA_DIVISORA)
+                tela.blit(txt_vazio, (sx(385), sy(y_linha + 11)))
+
+            y_linha += 49
+
+        btn_fechar = srect(350, 545, 500, 50)
         desenhar_botao(tela, btn_fechar, COR_VERMELHO, "FECHAR JOGO", raio=8)
 
     # GERENCIAMENTO DE EVENTOS DE ENTRADA
@@ -813,13 +920,13 @@ while rodando:
                             sel_local = (sel_local + 1) % 4
                 else:
                     if evento.key == pygame.K_ESCAPE:
-                        etapa_atual = "RANKING_FINAL"
+                        abrir_ranking_final()
                     elif evento.key == pygame.K_1:
                         if estado_jogo["pista_index"] < min(len(estado_jogo["pistas"]), limite_pistas_fase(nivel_atual)):
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 140 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -879,7 +986,7 @@ while rodando:
                         alvo_scroll = 0.0
                         modal_acusacao_aberto = False
                     elif btn_sair.collidepoint(pos_mouse):
-                        etapa_atual = "RANKING_FINAL"
+                        abrir_ranking_final()
 
                 elif modal_acusacao_aberto:
                     btn_s_esq = srect(480, 215, 35, 30)
@@ -948,7 +1055,7 @@ while rodando:
                             estado_jogo["pistas_reveladas"].append(estado_jogo["pistas"][estado_jogo["pista_index"]])
                             estado_jogo["pista_index"] += 1
                             animacao_nova_pista_y = 380.0
-                            alvo_scroll = max(0.0, float(altura_total_pistas + 100 - 401))
+                            alvo_scroll = max(0.0, float(altura_total_pistas + 140 - 401))
                         else:
                             estado_jogo["mensagem_resultado"] = "LIMITE DE PISTAS DESTA FASE ATINGIDO."
                             estado_jogo["cor_resultado"] = COR_AMARELO
@@ -957,7 +1064,7 @@ while rodando:
                         modal_acusacao_aberto = True
 
                     elif btn_sair_jogo.collidepoint(pos_mouse):
-                        etapa_atual = "RANKING_FINAL"
+                        abrir_ranking_final()
 
                     for lin in range(8):
                         for col in range(4):
@@ -966,7 +1073,7 @@ while rodando:
                                 estado_jogo["grelha_unica"][lin][col] = (estado_jogo["grelha_unica"][lin][col] + 1) % 3
 
             elif etapa_atual == "RANKING_FINAL":
-                btn_fechar = srect(350, 440, 500, 50)
+                btn_fechar = srect(350, 545, 500, 50)
                 if btn_fechar.collidepoint(pos_mouse):
                     rodando = False
 
