@@ -26,8 +26,18 @@ def tempo_limite_fase(fase):
     return max(30, 90 - (fase - 1) * 10)
 
 
-# FUNÇÕES DE GERENCIAMENTO DO RANKING TOP 10 (COMEÇA VAZIO)
+# FUNÇÕES DE GERENCIAMENTO DO RANKING TOP 10 (COMEÇA COM AS INTEGRANTES DO GRUPO)
 TAMANHO_RANKING = 10
+
+# Integrantes do grupo que já aparecem no ranking antes da primeira partida
+RANKING_INICIAL = [
+    {"nome": "Isabela", "pontos": 4200, "casos": 5},
+    {"nome": "Bruna", "pontos": 3900, "casos": 5},
+    {"nome": "Gabriela", "pontos": 3500, "casos": 4},
+    {"nome": "Isabel", "pontos": 3100, "casos": 4},
+    {"nome": "Anna", "pontos": 2700, "casos": 3},
+    {"nome": "Julia", "pontos": 2300, "casos": 3},
+]
 
 
 def caminho_arquivo_ranking():
@@ -45,7 +55,7 @@ def carregar_ranking():
                     return dados[:TAMANHO_RANKING]
         except Exception:
             pass
-    return []
+    return [dict(item) for item in RANKING_INICIAL]
 
 
 def registrar_no_ranking(nome, pontos, casos):
